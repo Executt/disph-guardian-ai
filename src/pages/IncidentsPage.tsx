@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
+import { EnvironmentFilter, type Environment } from "@/components/EnvironmentFilter";
 import { AlertTriangle, Clock, CheckCircle, Play, Terminal, Brain, Activity, Zap } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useRealtimeSeries, useRealtimeValue } from "@/hooks/useRealtimeData";
 
 const mockIncidents = [
   {
@@ -12,6 +14,7 @@ const mockIncidents = [
     title: "OOMKilled — Pod payments-api no cluster ROSA-PROD",
     severity: "critical" as const,
     environment: "AWS ROSA Produção",
+    envGroup: "AWS" as const,
     timestamp: "2024-03-31T14:23:00Z",
     status: "open",
     rootCause: "Memory limit de 512Mi excedido. Leak detectado no módulo de cache Redis. GC não coletando objetos da fila de transações.",
@@ -28,6 +31,7 @@ const mockIncidents = [
     title: "CVE-2024-3094 — Vulnerabilidade crítica xz-utils no cluster OKD-DEV",
     severity: "critical" as const,
     environment: "OCI OKD Dev/HMG",
+    envGroup: "OCI" as const,
     timestamp: "2024-03-31T12:05:00Z",
     status: "open",
     rootCause: "Imagem base node:18-alpine contém xz-utils 5.6.0 com backdoor confirmado. 14 pods afetados no namespace frontend-dev.",
@@ -44,6 +48,7 @@ const mockIncidents = [
     title: "Latência elevada — API Gateway Traefik On-Premise",
     severity: "warning" as const,
     environment: "On-Premise Produção",
+    envGroup: "On-Premise" as const,
     timestamp: "2024-03-31T10:30:00Z",
     status: "investigating",
     rootCause: "Rate limiting não configurado. Upstream backend-svc respondendo com p99 > 2s. Connection pool do PostgreSQL saturado.",
@@ -54,12 +59,42 @@ const mockIncidents = [
     recommendation: "Aplicar rate limiting via IngressRoute e aumentar pool_size do PostgreSQL para 200 via Ansible.",
     skill: "trigger_ansible_playbook",
   },
+  {
+    id: "INC-2024-0844",
+    title: "Disk pressure — Node worker-03 AWS ROSA-PROD",
+    severity: "warning" as const,
+    environment: "AWS ROSA Produção",
+    envGroup: "AWS" as const,
+    timestamp: "2024-03-31T09:15:00Z",
+    status: "investigating",
+    rootCause: "Volume /var/log com 91% de uso. Logs do Fluentd não rotacionados há 7 dias.",
+    evidence: [
+      "Zabbix: vfs.fs.pused[/var/log] = 91.2%",
+      "Prometheus: node_filesystem_avail_bytes{mountpoint='/var/log'} < 2Gi",
+    ],
+    recommendation: "Executar playbook ansible/log-rotation.yml e configurar logrotate com retenção de 3 dias.",
+    skill: "trigger_ansible_playbook",
+  },
 ];
 
 export default function IncidentsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(mockIncidents[0].id);
   const [executingId, setExecutingId] = useState<string | null>(null);
   const [terminalLines, setTerminalLines] = useState<string[]>([]);
+  const [envFilter, setEnvFilter] = useState<Environment>("all");
+
+  const incidentsOpen = useRealtimeValue(12, 2, 5000);
+  const mttr = useRealtimeValue(23, 5, 4000);
+  const autoRemediation = useRealtimeValue(47, 3, 6000);
+
+  const incidentSparkline = useRealtimeSeries(12, 3, 20, 3000);
+  const mttrSparkline = useRealtimeSeries(23, 5, 20, 3500);
+  const autoSparkline = useRealtimeSeries(47, 4, 20, 4000);
+  const resolvedSparkline = useRealtimeSeries(8, 2, 20, 3000);
+
+  const filteredIncidents = useMemo(() =>
+    envFilter === "all" ? mockIncidents : mockIncidents.filter(inc => inc.envGroup === envFilter)
+  , [envFilter]);
 
   const handleExecute = (incident: typeof mockIncidents[0]) => {
     setExecutingId(incident.id);
@@ -89,20 +124,77 @@ export default function IncidentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Console de Incidentes AIOps</h1>
-        <p className="text-sm text-muted-foreground font-mono">Motor de IA com Guardrails • Busca Híbrida RAG • MCP</p>
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Console de Incidentes AIOps</h1>
+          <p className="text-sm text-muted-foreground font-mono">Motor de IA com Guardrails • Busca Híbrida RAG • MCP</p>
+        </div>
+        <EnvironmentFilter selected={envFilter} onChange={setEnvFilter} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard title="Incidentes Abertos" value={12} subtitle="↑ 3 nas últimas 24h" icon={AlertTriangle} trend="down" />
-        <MetricCard title="MTTR Médio" value="23min" subtitle="↓ 8min vs semana anterior" icon={Clock} trend="up" />
-        <MetricCard title="Auto-Remediações" value={47} subtitle="Taxa de sucesso: 94%" icon={Zap} trend="up" />
-        <MetricCard title="Resolvidos Hoje" value={8} subtitle="5 automáticos, 3 manuais" icon={CheckCircle} trend="up" />
+        <MetricCard
+          title="Incidentes Abertos"
+          value={Math.round(incidentsOpen)}
+          subtitle="↑ 3 nas últimas 24h"
+          icon={AlertTriangle}
+          trend="down"
+          sparklineData={incidentSparkline}
+          drilldownItems={[
+            { label: "AWS (ROSA)", value: mockIncidents.filter(i => i.envGroup === "AWS").length, env: "AWS" },
+            { label: "OCI (OKD)", value: mockIncidents.filter(i => i.envGroup === "OCI").length, env: "OCI" },
+            { label: "On-Premise", value: mockIncidents.filter(i => i.envGroup === "On-Premise").length, env: "On-Premise" },
+          ]}
+        />
+        <MetricCard
+          title="MTTR Médio"
+          value={`${Math.round(mttr)}min`}
+          subtitle="↓ 8min vs semana anterior"
+          icon={Clock}
+          trend="up"
+          sparklineData={mttrSparkline}
+          drilldownItems={[
+            { label: "Críticos", value: "18min" },
+            { label: "Warnings", value: "31min" },
+            { label: "Info", value: "45min" },
+          ]}
+        />
+        <MetricCard
+          title="Auto-Remediações"
+          value={Math.round(autoRemediation)}
+          subtitle="Taxa de sucesso: 94%"
+          icon={Zap}
+          trend="up"
+          sparklineData={autoSparkline}
+          drilldownItems={[
+            { label: "Ansible Playbooks", value: 28 },
+            { label: "GitLab MRs", value: 12 },
+            { label: "GLPI Tickets", value: 7 },
+          ]}
+        />
+        <MetricCard
+          title="Resolvidos Hoje"
+          value={8}
+          subtitle="5 automáticos, 3 manuais"
+          icon={CheckCircle}
+          trend="up"
+          sparklineData={resolvedSparkline}
+          drilldownItems={[
+            { label: "Auto-remediação", value: 5 },
+            { label: "Intervenção manual", value: 3 },
+          ]}
+        />
       </div>
 
       <div className="space-y-4">
-        {mockIncidents.map((incident) => {
+        {filteredIncidents.length === 0 && (
+          <Card className="bg-card border-border">
+            <CardContent className="py-8 text-center">
+              <p className="text-sm text-muted-foreground font-mono">Nenhum incidente neste ambiente</p>
+            </CardContent>
+          </Card>
+        )}
+        {filteredIncidents.map((incident) => {
           const isExpanded = expandedId === incident.id;
           const isExecuting = executingId === incident.id;
 
@@ -117,11 +209,12 @@ export default function IncidentsPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-xs text-muted-foreground">{incident.id}</span>
                       <Badge variant={incident.severity === "critical" ? "destructive" : "secondary"} className="text-[10px] font-mono uppercase">
                         {incident.severity}
                       </Badge>
+                      <Badge variant="outline" className="text-[10px] font-mono">{incident.envGroup}</Badge>
                       <StatusBadge status={incident.severity === "critical" ? "critical" : "warning"} />
                     </div>
                     <CardTitle className="text-base">{incident.title}</CardTitle>
@@ -140,30 +233,22 @@ export default function IncidentsPage() {
                       </h4>
                       <p className="text-sm text-foreground/80 leading-relaxed">{incident.rootCause}</p>
                     </div>
-
                     <div className="space-y-2">
                       <h4 className="text-xs font-mono uppercase tracking-wider text-accent flex items-center gap-1.5">
                         <Terminal className="h-3 w-3" /> Evidências
                       </h4>
                       <ul className="space-y-1">
                         {incident.evidence.map((ev, i) => (
-                          <li key={i} className="text-xs font-mono text-muted-foreground bg-muted/50 rounded px-2 py-1.5 break-all">
-                            {ev}
-                          </li>
+                          <li key={i} className="text-xs font-mono text-muted-foreground bg-muted/50 rounded px-2 py-1.5 break-all">{ev}</li>
                         ))}
                       </ul>
                     </div>
-
                     <div className="space-y-2">
                       <h4 className="text-xs font-mono uppercase tracking-wider text-primary flex items-center gap-1.5">
                         <Zap className="h-3 w-3" /> Solução Recomendada
                       </h4>
                       <p className="text-sm text-foreground/80 leading-relaxed">{incident.recommendation}</p>
-                      <div className="flex items-center gap-2 pt-2">
-                        <Badge variant="outline" className="font-mono text-[10px]">
-                          Skill: {incident.skill}
-                        </Badge>
-                      </div>
+                      <Badge variant="outline" className="font-mono text-[10px]">Skill: {incident.skill}</Badge>
                     </div>
                   </div>
 
@@ -188,9 +273,7 @@ export default function IncidentsPage() {
                           line.includes("PROGRESS") ? "text-warning" :
                           line.includes("ERROR") ? "text-destructive" :
                           "text-muted-foreground"
-                        }`}>
-                          {line}
-                        </div>
+                        }`}>{line}</div>
                       ))}
                       <span className="inline-block w-2 h-4 bg-primary/70 status-pulse" />
                     </div>
