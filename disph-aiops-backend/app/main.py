@@ -27,6 +27,7 @@ app.add_middleware(
 app.include_router(rag_router, prefix="/api/v1/rag", tags=["RAG"])
 app.include_router(skills_router, prefix="/api/v1/skills", tags=["Skills"])
 app.include_router(incidents_router, prefix="/api/v1/incidents", tags=["Incidents"])
+app.include_router(notifications_router)
 
 
 @app.get("/health")
