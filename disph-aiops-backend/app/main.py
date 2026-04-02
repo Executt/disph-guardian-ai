@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.rag import router as rag_router
 from app.api.skills import router as skills_router
 from app.api.incidents import router as incidents_router
+from app.api.notifications import router as notifications_router
 
 app = FastAPI(
     title="DISPH-AIOPS",
@@ -26,6 +27,7 @@ app.add_middleware(
 app.include_router(rag_router, prefix="/api/v1/rag", tags=["RAG"])
 app.include_router(skills_router, prefix="/api/v1/skills", tags=["Skills"])
 app.include_router(incidents_router, prefix="/api/v1/incidents", tags=["Incidents"])
+app.include_router(notifications_router)
 
 
 @app.get("/health")
