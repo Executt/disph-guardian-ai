@@ -1,11 +1,17 @@
-"""Skills de ITSM – GLPI, Jira, ServiceNow, CITSmart."""
+"""Skills de ITSM – GLPI, Jira, ServiceNow, CITSmart com integração real."""
 
 from app.skills.registry import register_skill
+from app.services.itsm.client import (
+    GLPIClient,
+    JiraClient,
+    ServiceNowClient,
+    CITSmartClient,
+)
 
 
 @register_skill(
     name="open_glpi_ticket",
-    description="Abre chamado no GLPI com categorização automática",
+    description="Abre chamado no GLPI com categorização automática via REST API",
     risk_level=1,
     required_role="operator",
     parameters_schema={
@@ -17,26 +23,20 @@ from app.skills.registry import register_skill
     },
 )
 async def open_glpi_ticket(params: dict) -> dict:
-    """
-    Skeleton: Cria ticket no GLPI via REST API.
-
-    Em produção:
-    1. POST /apirest.php/initSession (autenticação)
-    2. POST /apirest.php/Ticket (criação)
-    """
-    return {
-        "action": "glpi_ticket_created",
-        "ticket_id": "GLPI-2024-00142",
-        "title": params.get("title"),
-        "priority": params.get("priority", 3),
-        "status": "new",
-        "url": "https://glpi.gov.br/front/ticket.form.php?id=142",
-    }
+    client = GLPIClient()
+    result = await client.create_ticket(
+        title=params["title"],
+        description=params["description"],
+        category=params["category"],
+        priority=params.get("priority", 3),
+        assigned_group=params.get("assigned_group"),
+    )
+    return {"action": "glpi_ticket_created", **result}
 
 
 @register_skill(
     name="open_jira_ticket",
-    description="Cria issue no Jira com labels e componentes",
+    description="Cria issue no Jira Cloud/DC com ADF formatting e labels",
     risk_level=1,
     required_role="operator",
     parameters_schema={
@@ -49,17 +49,21 @@ async def open_glpi_ticket(params: dict) -> dict:
     },
 )
 async def open_jira_ticket(params: dict) -> dict:
-    return {
-        "action": "jira_ticket_created",
-        "ticket_id": f"{params.get('project_key', 'DISPH')}-1042",
-        "summary": params.get("summary"),
-        "status": "To Do",
-    }
+    client = JiraClient()
+    result = await client.create_issue(
+        project_key=params["project_key"],
+        summary=params["summary"],
+        description=params["description"],
+        issue_type=params.get("issue_type", "Bug"),
+        priority=params.get("priority", "High"),
+        labels=params.get("labels"),
+    )
+    return {"action": "jira_ticket_created", **result}
 
 
 @register_skill(
     name="open_servicenow_incident",
-    description="Cria incidente no ServiceNow via Table API",
+    description="Cria incidente no ServiceNow via Table API REST",
     risk_level=1,
     required_role="operator",
     parameters_schema={
@@ -71,17 +75,20 @@ async def open_jira_ticket(params: dict) -> dict:
     },
 )
 async def open_servicenow_incident(params: dict) -> dict:
-    return {
-        "action": "servicenow_incident_created",
-        "incident_number": "INC0042567",
-        "short_description": params.get("short_description"),
-        "status": "New",
-    }
+    client = ServiceNowClient()
+    result = await client.create_incident(
+        short_description=params["short_description"],
+        description=params["description"],
+        urgency=params.get("urgency", 2),
+        impact=params.get("impact", 2),
+        assignment_group=params.get("assignment_group"),
+    )
+    return {"action": "servicenow_incident_created", **result}
 
 
 @register_skill(
     name="open_citsmart_ticket",
-    description="Cria requisição de serviço no CITSmart/ITSM",
+    description="Cria requisição de serviço no CITSmart/ITSM via API REST",
     risk_level=1,
     required_role="operator",
     parameters_schema={
@@ -92,9 +99,11 @@ async def open_servicenow_incident(params: dict) -> dict:
     },
 )
 async def open_citsmart_ticket(params: dict) -> dict:
-    return {
-        "action": "citsmart_ticket_created",
-        "ticket_id": "REQ-2024-003891",
-        "service_id": params.get("service_id"),
-        "status": "Em Andamento",
-    }
+    client = CITSmartClient()
+    result = await client.create_request(
+        service_id=params["service_id"],
+        description=params["description"],
+        requester=params["requester"],
+        urgency=params.get("urgency", "Medium"),
+    )
+    return {"action": "citsmart_ticket_created", **result}
