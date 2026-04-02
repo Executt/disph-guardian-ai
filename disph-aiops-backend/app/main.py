@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.rag import router as rag_router
 from app.api.skills import router as skills_router
 from app.api.incidents import router as incidents_router
+from app.api.notifications import router as notifications_router
 
 app = FastAPI(
     title="DISPH-AIOPS",
