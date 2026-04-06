@@ -11,6 +11,7 @@ import IncidentsPage from "@/pages/IncidentsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import DevSecOpsPage from "@/pages/DevSecOpsPage";
 import InfrastructurePage from "@/pages/InfrastructurePage";
+import AuditPage from "@/pages/AuditPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={["admin", "operator"]}>
                     <InfrastructurePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/audit"
+                element={
+                  <ProtectedRoute requiredRoles={["admin"]}>
+                    <AuditPage />
                   </ProtectedRoute>
                 }
               />

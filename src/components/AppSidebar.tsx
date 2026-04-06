@@ -1,4 +1,4 @@
-import { Settings, LayoutDashboard, Server, AlertTriangle, Shield, Brain } from "lucide-react";
+import { Settings, LayoutDashboard, Server, AlertTriangle, Shield, Brain, ShieldCheck } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const modules = [
-  { title: "Configurações", url: "/settings", icon: Settings },
-  { title: "DevSecOps", url: "/devsecops", icon: Shield },
-  { title: "Infraestrutura", url: "/infrastructure", icon: Server },
   { title: "Incidentes AIOps", url: "/", icon: AlertTriangle },
+  { title: "Infraestrutura", url: "/infrastructure", icon: Server },
+  { title: "DevSecOps", url: "/devsecops", icon: Shield },
+  { title: "Auditoria LGPD", url: "/audit", icon: ShieldCheck },
+  { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
