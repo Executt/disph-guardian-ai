@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { MetricCard } from "@/components/MetricCard";
 import { EnvironmentFilter, Environment } from "@/components/EnvironmentFilter";
+import { AIChatConsole } from "@/components/AIChatConsole";
 import { useRealtimeValue, useRealtimeSeries, useRealtimeTimeline } from "@/hooks/useRealtimeData";
 import {
   AlertTriangle, ShieldCheck, Clock, Activity, Server,
@@ -91,6 +92,7 @@ function generateAvailabilityByService(env: Environment) {
 
 export default function Index() {
   const [env, setEnv] = useState<Environment>("all");
+  const [chatExpanded, setChatExpanded] = useState(false);
 
   const base = envBaseData[env];
   const incidents = useRealtimeValue(base.incidents, 3);
@@ -353,6 +355,13 @@ export default function Index() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* AI Chat Console */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className={chatExpanded ? "lg:col-span-2" : ""}>
+          <AIChatConsole expanded={chatExpanded} onToggleExpand={() => setChatExpanded(!chatExpanded)} />
+        </div>
       </div>
     </div>
   );
