@@ -356,6 +356,13 @@ export default function Index() {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Chat Console */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className={chatExpanded ? "lg:col-span-2" : ""}>
+          <AIChatConsole expanded={chatExpanded} onToggleExpand={() => setChatExpanded(!chatExpanded)} />
+        </div>
+      </div>
     </div>
   );
 }
