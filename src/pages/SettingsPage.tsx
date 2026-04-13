@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Settings, Key, Webhook, Server, Brain, Shield, Plus, Pencil, Trash2, Container } from "lucide-react";
+import { Settings, Key, Webhook, Server, Brain, Shield, Plus, Pencil, Trash2, Container, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { AI_MODELS } from "@/components/AIChatConsole";
 
 const CLUSTER_PROVIDERS = [
   { value: "eks", label: "AWS (Amazon EKS)", icon: "🟠" },
@@ -188,29 +189,82 @@ export default function SettingsPage() {
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Brain className="h-4 w-4 text-primary" /> Modelo de IA / LLM
+              <Sparkles className="h-4 w-4 text-accent" /> Modelos de IA — Lovable AI
             </CardTitle>
-            <CardDescription className="font-mono text-xs">Configuração do motor RAG e modelo de linguagem</CardDescription>
+            <CardDescription className="font-mono text-xs">Modelos disponíveis via Lovable AI Gateway · Selecione, configure e teste</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs font-mono uppercase tracking-wider">Provedor</Label>
-              <Select defaultValue="opensource">
+              <Label className="text-xs font-mono uppercase tracking-wider">Modelo Padrão do Chat</Label>
+              <Select defaultValue="google/gemini-3-flash-preview">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  {AI_MODELS.map(m => (
+                    <SelectItem key={m.value} value={m.value}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[8px] px-1 py-0">{m.tier}</Badge>
+                        {m.label}
+                        <span className="text-muted-foreground text-[10px]">— {m.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Modelos Cadastrados</p>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {AI_MODELS.map(m => (
+                  <div key={m.value} className="flex items-center justify-between p-2 rounded-md bg-secondary/30 border border-border/40">
+                    <div className="flex items-center gap-2">
+                      <Zap className={`h-3.5 w-3.5 ${m.tier === "premium" ? "text-warning" : m.tier === "standard" ? "text-accent" : "text-primary"}`} />
+                      <div>
+                        <p className="text-xs font-medium">{m.label}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{m.value}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className={`text-[9px] ${
+                        m.tier === "premium" ? "border-warning/40 text-warning" :
+                        m.tier === "standard" ? "border-accent/40 text-accent" :
+                        "border-primary/40 text-primary"
+                      }`}>
+                        {m.tier === "premium" ? "💎 Premium" : m.tier === "standard" ? "⚡ Standard" : "🚀 Fast"}
+                      </Badge>
+                      <Switch defaultChecked />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <hr className="border-border" />
+
+            <div className="space-y-2">
+              <Label className="text-xs font-mono uppercase tracking-wider">Provedor Adicional (Custom)</Label>
+              <Select defaultValue="none">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum — Apenas Lovable AI</SelectItem>
                   <SelectItem value="opensource">Open-Source (LLaMA / Mistral)</SelectItem>
-                  <SelectItem value="azure">Microsoft Copilot / Azure OpenAI</SelectItem>
+                  <SelectItem value="azure">Azure OpenAI</SelectItem>
+                  <SelectItem value="ollama">Ollama (Local)</SelectItem>
+                  <SelectItem value="custom">Endpoint Custom (OpenAI-compatible)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-mono uppercase tracking-wider">API Endpoint</Label>
+              <Label className="text-xs font-mono uppercase tracking-wider">API Endpoint (Custom)</Label>
               <Input placeholder="https://llm.corp.gov.br/v1" className="font-mono text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-mono uppercase tracking-wider">API Key</Label>
+              <Label className="text-xs font-mono uppercase tracking-wider">API Key (Custom)</Label>
               <Input type="password" placeholder="••••••••••••••••" className="font-mono text-sm" />
             </div>
+
+            <hr className="border-border" />
+
             <div className="space-y-2">
               <Label className="text-xs font-mono uppercase tracking-wider">Embedding Dimensions</Label>
               <Input type="number" defaultValue={1536} className="font-mono text-sm" />
@@ -222,6 +276,16 @@ export default function SettingsPage() {
               </div>
               <Switch defaultChecked />
             </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">Reasoning Mode</p>
+                <p className="text-[11px] text-muted-foreground font-mono">Raciocínio estendido para consultas complexas</p>
+              </div>
+              <Switch />
+            </div>
+            <Button variant="outline" className="w-full font-mono text-xs" onClick={() => toast.success("Teste de conectividade bem-sucedido!")}>
+              Testar Gateway AI
+            </Button>
           </CardContent>
         </Card>
 

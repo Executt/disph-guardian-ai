@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Send, User, Sparkles, X, Maximize2, Minimize2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Bot, Send, User, Sparkles, X, Maximize2, Minimize2, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
@@ -22,119 +24,107 @@ const SUGGESTED_QUERIES = [
   "Resumo operacional do dia",
 ];
 
-// Simulated AI responses based on keywords
-function generateMockResponse(query: string): string {
-  const q = query.toLowerCase();
+export const AI_MODELS = [
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", description: "Rápido e eficiente", tier: "fast" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Equilibrado", tier: "fast" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", description: "Mais rápido e econômico", tier: "fast" },
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Melhor raciocínio complexo", tier: "premium" },
+  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", description: "Última geração Google", tier: "premium" },
+  { value: "openai/gpt-5", label: "GPT-5", description: "Poderoso, multimodal", tier: "premium" },
+  { value: "openai/gpt-5-mini", label: "GPT-5 Mini", description: "Custo-benefício", tier: "standard" },
+  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", description: "Velocidade máxima", tier: "fast" },
+  { value: "openai/gpt-5.2", label: "GPT-5.2", description: "Raciocínio avançado", tier: "premium" },
+] as const;
 
-  if (q.includes("p1") || q.includes("crítico") || q.includes("critico")) {
-    return `## Incidentes P1 — Críticos
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
-Atualmente existem **3 incidentes P1** abertos:
+async function streamChat({
+  messages,
+  model,
+  onDelta,
+  onDone,
+  onError,
+}: {
+  messages: { role: string; content: string }[];
+  model: string;
+  onDelta: (text: string) => void;
+  onDone: () => void;
+  onError: (err: string) => void;
+}) {
+  const resp = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ messages, model }),
+  });
 
-| ID | Serviço | Ambiente | Duração |
-|---|---|---|---|
-| INC-2847 | API Gateway | AWS | 23 min |
-| INC-2851 | DB Primary | On-Premise | 14 min |
-| INC-2853 | Auth Service | OCI | 8 min |
-
-⚠️ **Recomendação**: O INC-2847 já ultrapassou o threshold de 20 min. Considere escalar para o time de plantão.`;
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({ error: "Erro de conexão" }));
+    onError(data.error || `Erro ${resp.status}`);
+    return;
   }
 
-  if (q.includes("mttr")) {
-    return `## MTTR — Mean Time to Resolve
-
-O MTTR médio das últimas **24 horas** é de **18 minutos**.
-
-- 🟢 **AWS**: 14 min (melhor performance)
-- 🟡 **OCI**: 21 min
-- 🔴 **On-Premise**: 22 min
-
-📈 **Tendência**: Redução de **12%** em relação à semana anterior. O maior ganho veio da automação de rollback via Ansible nos clusters EKS.`;
+  if (!resp.body) {
+    onError("Sem corpo na resposta");
+    return;
   }
 
-  if (q.includes("sla")) {
-    return `## SLA Compliance
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let textBuffer = "";
+  let streamDone = false;
 
-O SLA consolidado atual é de **97.2%** (meta: 99.0%).
+  while (!streamDone) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    textBuffer += decoder.decode(value, { stream: true });
 
-| Ambiente | SLA | Status |
-|---|---|---|
-| AWS | 98.1% | 🟡 Próximo da meta |
-| OCI | 96.8% | 🔴 Abaixo da meta |
-| On-Premise | 96.5% | 🔴 Abaixo da meta |
+    let newlineIndex: number;
+    while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+      let line = textBuffer.slice(0, newlineIndex);
+      textBuffer = textBuffer.slice(newlineIndex + 1);
 
-⚠️ O ambiente **On-Premise** é o maior detrator. Os incidentes no cluster OpenShift impactaram 2.1% do SLA nas últimas 6h.`;
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
+      if (!line.startsWith("data: ")) continue;
+
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") {
+        streamDone = true;
+        break;
+      }
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+        if (content) onDelta(content);
+      } catch {
+        textBuffer = line + "\n" + textBuffer;
+        break;
+      }
+    }
   }
 
-  if (q.includes("degradad") || q.includes("serviço") || q.includes("servico") || q.includes("disponibilidade")) {
-    return `## Serviços Degradados
-
-Neste momento, **2 serviços** apresentam degradação:
-
-1. **Cache Redis** (On-Premise) — Uptime: 99.52%
-   - Latência elevada (p99: 45ms vs baseline 12ms)
-   - Causa provável: memory pressure no nó worker-03
-
-2. **MQ Kafka** (OCI) — Uptime: 99.61%
-   - Consumer lag crescente no tópico \`events.incidents\`
-   - 3 partições com rebalanceamento pendente
-
-Todos os demais serviços operam com uptime > 99.90%.`;
+  // Final flush
+  if (textBuffer.trim()) {
+    for (let raw of textBuffer.split("\n")) {
+      if (!raw) continue;
+      if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+      if (raw.startsWith(":") || raw.trim() === "") continue;
+      if (!raw.startsWith("data: ")) continue;
+      const jsonStr = raw.slice(6).trim();
+      if (jsonStr === "[DONE]") continue;
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+        if (content) onDelta(content);
+      } catch { /* ignore */ }
+    }
   }
 
-  if (q.includes("resumo") || q.includes("operacional") || q.includes("dia") || q.includes("geral")) {
-    return `## 📋 Resumo Operacional — ${new Date().toLocaleDateString("pt-BR")}
-
-### Incidentes
-- **47** incidentes ativos (3 P1, 8 P2, 16 P3, 20 P4)
-- **32** incidentes resolvidos nas últimas 24h
-- MTTR médio: **18 min** (↓12% vs semana anterior)
-
-### Disponibilidade
-- Uptime global: **99.94%**
-- SLA compliance: **97.2%** (⚠️ abaixo da meta de 99%)
-
-### Destaques
-- ✅ Automação Ansible resolveu 8 incidentes sem intervenção humana
-- ⚠️ Cluster OCP On-Premise com 3 pods em CrashLoopBackOff
-- 🔄 Deploy v2.14.3 do API Gateway agendado para 22:00
-
-### Recomendações
-1. Escalar INC-2847 (P1 > 20 min)
-2. Investigar memory pressure no Redis On-Premise
-3. Verificar consumer lag no Kafka OCI`;
-  }
-
-  if (q.includes("incidente") || q.includes("aberto")) {
-    return `## Incidentes Ativos
-
-Total: **47 incidentes** distribuídos por severidade:
-
-- 🔴 **P1 Crítico**: 3 incidentes
-- 🟠 **P2 Alto**: 8 incidentes  
-- 🟡 **P3 Médio**: 16 incidentes
-- ⚪ **P4 Baixo**: 20 incidentes
-
-**Por ambiente:**
-- AWS: 18 | OCI: 15 | On-Premise: 14
-
-Os 3 incidentes P1 requerem atenção imediata. Deseja que eu detalhe algum deles?`;
-  }
-
-  return `Analisei sua consulta: "*${query}*"
-
-Com base nos dados operacionais atuais:
-
-- **47** incidentes ativos nos 3 ambientes
-- SLA consolidado em **97.2%**
-- MTTR médio de **18 minutos**
-- Disponibilidade global: **99.94%**
-
-Posso detalhar qualquer métrica específica. Experimente perguntar sobre:
-- Incidentes por severidade ou ambiente
-- Tendências de SLA e MTTR
-- Serviços degradados
-- Resumo operacional completo`;
+  onDone();
 }
 
 interface AIChatConsoleProps {
@@ -147,14 +137,14 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
     {
       id: "welcome",
       role: "assistant",
-      content: "Olá! Sou o **DISPH AI Assistant**. Posso ajudar com consultas sobre incidentes, métricas de SLA, MTTR, disponibilidade e muito mais. O que deseja saber?",
+      content: "Olá! Sou o **DISPH AI Assistant** powered by Lovable AI. Posso ajudar com consultas sobre incidentes, métricas de SLA, MTTR, disponibilidade e muito mais. O que deseja saber?",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("google/gemini-3-flash-preview");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -177,19 +167,50 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI thinking delay
-    await new Promise((r) => setTimeout(r, 800 + Math.random() * 1200));
+    let assistantSoFar = "";
 
-    const response = generateMockResponse(query);
-    const assistantMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: response,
-      timestamp: new Date(),
+    const upsertAssistant = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.id !== "welcome") {
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
+          );
+        }
+        return [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: assistantSoFar,
+            timestamp: new Date(),
+          },
+        ];
+      });
     };
 
-    setMessages((prev) => [...prev, assistantMsg]);
-    setIsTyping(false);
+    const chatHistory = [...messages.filter(m => m.id !== "welcome"), userMsg].map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    try {
+      await streamChat({
+        messages: chatHistory,
+        model: selectedModel,
+        onDelta: upsertAssistant,
+        onDone: () => setIsTyping(false),
+        onError: (err) => {
+          toast.error(err);
+          setIsTyping(false);
+        },
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha na comunicação com a IA");
+      setIsTyping(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -210,6 +231,8 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
     ]);
   };
 
+  const currentModel = AI_MODELS.find(m => m.value === selectedModel);
+
   return (
     <Card className={`border-border/60 bg-card/80 backdrop-blur flex flex-col ${expanded ? "h-[80vh]" : "h-[500px]"}`}>
       <CardHeader className="pb-3 flex-shrink-0">
@@ -220,10 +243,29 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
             </div>
             <div>
               <CardTitle className="text-sm">DISPH AI Assistant</CardTitle>
-              <p className="text-[10px] text-muted-foreground font-mono">Consultas em linguagem natural</p>
+              <p className="text-[10px] text-muted-foreground font-mono">
+                {currentModel?.label} · Lovable AI
+              </p>
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="h-7 w-[130px] text-[10px] font-mono">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((m) => (
+                  <SelectItem key={m.value} value={m.value} className="text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className="text-[8px] px-1 py-0">
+                        {m.tier}
+                      </Badge>
+                      {m.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {onToggleExpand && (
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggleExpand}>
                 {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -268,10 +310,10 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
             </div>
           ))}
 
-          {isTyping && (
+          {isTyping && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="flex gap-2 items-start">
               <div className="h-6 w-6 rounded-md bg-accent/20 flex items-center justify-center flex-shrink-0">
-                <Bot className="h-3.5 w-3.5 text-accent animate-pulse" />
+                <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" />
               </div>
               <div className="bg-secondary/60 rounded-lg px-3 py-2">
                 <div className="flex gap-1">
@@ -303,7 +345,6 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
         {/* Input */}
         <div className="flex gap-2 flex-shrink-0">
           <Input
-            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
