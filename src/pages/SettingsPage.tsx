@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Settings, Key, Webhook, Server, Brain, Shield, Plus, Pencil, Trash2, Container } from "lucide-react";
+import { Settings, Key, Webhook, Server, Brain, Shield, Plus, Pencil, Trash2, Container, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { AI_MODELS } from "@/components/AIChatConsole";
 
 const CLUSTER_PROVIDERS = [
   { value: "eks", label: "AWS (Amazon EKS)", icon: "🟠" },
