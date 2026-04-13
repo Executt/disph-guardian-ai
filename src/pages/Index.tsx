@@ -92,6 +92,7 @@ function generateAvailabilityByService(env: Environment) {
 
 export default function Index() {
   const [env, setEnv] = useState<Environment>("all");
+  const [chatExpanded, setChatExpanded] = useState(false);
 
   const base = envBaseData[env];
   const incidents = useRealtimeValue(base.incidents, 3);
