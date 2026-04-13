@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { MetricCard } from "@/components/MetricCard";
 import { EnvironmentFilter, Environment } from "@/components/EnvironmentFilter";
+import { AIChatConsole } from "@/components/AIChatConsole";
 import { useRealtimeValue, useRealtimeSeries, useRealtimeTimeline } from "@/hooks/useRealtimeData";
 import {
   AlertTriangle, ShieldCheck, Clock, Activity, Server,
