@@ -14,16 +14,267 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          model: string
+          tokens_used: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          model?: string
+          tokens_used?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          model?: string
+          tokens_used?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: string | null
+          resource_id: string | null
+          resource_type: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          resource_id?: string | null
+          resource_type: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      clusters: {
+        Row: {
+          api_endpoint: string | null
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          kubernetes_version: string | null
+          name: string
+          node_count: number | null
+          provider: Database["public"]["Enums"]["cluster_provider"]
+          region: string | null
+          status: Database["public"]["Enums"]["cluster_status"]
+          updated_at: string
+        }
+        Insert: {
+          api_endpoint?: string | null
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          kubernetes_version?: string | null
+          name: string
+          node_count?: number | null
+          provider: Database["public"]["Enums"]["cluster_provider"]
+          region?: string | null
+          status?: Database["public"]["Enums"]["cluster_status"]
+          updated_at?: string
+        }
+        Update: {
+          api_endpoint?: string | null
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          kubernetes_version?: string | null
+          name?: string
+          node_count?: number | null
+          provider?: Database["public"]["Enums"]["cluster_provider"]
+          region?: string | null
+          status?: Database["public"]["Enums"]["cluster_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      incidents: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          environment: string
+          id: string
+          mttr_minutes: number | null
+          resolved_at: string | null
+          service: string | null
+          severity: Database["public"]["Enums"]["incident_severity"]
+          source: string
+          status: Database["public"]["Enums"]["incident_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          environment?: string
+          id?: string
+          mttr_minutes?: number | null
+          resolved_at?: string | null
+          service?: string | null
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          source?: string
+          status?: Database["public"]["Enums"]["incident_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          environment?: string
+          id?: string
+          mttr_minutes?: number | null
+          resolved_at?: string | null
+          service?: string | null
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          source?: string
+          status?: Database["public"]["Enums"]["incident_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          department: string | null
+          display_name: string | null
+          email: string | null
+          id: string
+          mfa_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          department?: string | null
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          mfa_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          department?: string | null
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          mfa_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "operator" | "viewer" | "auditor"
+      cluster_provider:
+        | "eks"
+        | "gke"
+        | "aks"
+        | "cce"
+        | "oke"
+        | "openshift"
+        | "openshift_local"
+        | "okd"
+        | "rancher"
+      cluster_status:
+        | "active"
+        | "inactive"
+        | "provisioning"
+        | "error"
+        | "maintenance"
+      incident_severity: "critical" | "high" | "medium" | "low"
+      incident_status:
+        | "open"
+        | "investigating"
+        | "mitigating"
+        | "resolved"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +401,34 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "operator", "viewer", "auditor"],
+      cluster_provider: [
+        "eks",
+        "gke",
+        "aks",
+        "cce",
+        "oke",
+        "openshift",
+        "openshift_local",
+        "okd",
+        "rancher",
+      ],
+      cluster_status: [
+        "active",
+        "inactive",
+        "provisioning",
+        "error",
+        "maintenance",
+      ],
+      incident_severity: ["critical", "high", "medium", "low"],
+      incident_status: [
+        "open",
+        "investigating",
+        "mitigating",
+        "resolved",
+        "closed",
+      ],
+    },
   },
 } as const
