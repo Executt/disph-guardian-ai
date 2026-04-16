@@ -7,11 +7,13 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/LoginPage";
+import Index from "@/pages/Index";
 import IncidentsPage from "@/pages/IncidentsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import DevSecOpsPage from "@/pages/DevSecOpsPage";
 import InfrastructurePage from "@/pages/InfrastructurePage";
 import AuditPage from "@/pages/AuditPage";
+import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,7 +34,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<IncidentsPage />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/incidents" element={<IncidentsPage />} />
               <Route
                 path="/settings"
                 element={
@@ -62,6 +65,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={["admin"]}>
                     <AuditPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRoles={["admin"]}>
+                    <AdminPage />
                   </ProtectedRoute>
                 }
               />

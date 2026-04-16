@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,56 +6,58 @@
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 210 20% 92%;
+    --background: 222 47% 5%;
+    --foreground: 210 40% 96%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 92%;
+    --card: 222 40% 8%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 222 40% 8%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 142 60% 45%;
-    --primary-foreground: 220 20% 7%;
+    --primary: 195 100% 50%;
+    --primary-foreground: 222 47% 5%;
 
-    --secondary: 220 16% 16%;
-    --secondary-foreground: 210 20% 85%;
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 210 30% 80%;
 
-    --muted: 220 14% 14%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 222 25% 12%;
+    --muted-foreground: 215 20% 50%;
 
-    --accent: 199 80% 50%;
-    --accent-foreground: 220 20% 7%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 222 47% 5%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 20% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 220 20% 7%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 222 47% 5%;
 
-    --success: 142 60% 45%;
-    --success-foreground: 220 20% 7%;
+    --success: 160 84% 39%;
+    --success-foreground: 222 47% 5%;
 
-    --border: 220 14% 18%;
-    --input: 220 14% 18%;
-    --ring: 142 60% 45%;
+    --border: 222 25% 15%;
+    --input: 222 25% 15%;
+    --ring: 195 100% 50%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 220 22% 6%;
-    --sidebar-foreground: 210 15% 70%;
-    --sidebar-primary: 142 60% 45%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 16% 12%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 220 14% 14%;
-    --sidebar-ring: 142 60% 45%;
+    --sidebar-background: 222 47% 4%;
+    --sidebar-foreground: 210 20% 65%;
+    --sidebar-primary: 195 100% 50%;
+    --sidebar-primary-foreground: 222 47% 5%;
+    --sidebar-accent: 222 30% 11%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 222 25% 12%;
+    --sidebar-ring: 195 100% 50%;
 
-    --chart-1: 142 60% 45%;
-    --chart-2: 199 80% 50%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 0 72% 51%;
-    --chart-5: 262 60% 55%;
+    --chart-1: 195 100% 50%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 45 93% 47%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 280 67% 60%;
+
+    --nav-height: 3.5rem;
   }
 }
 
@@ -69,20 +71,24 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
+  h1, h2, h3, .heading {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  }
+
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
 }
 
 @layer utilities {
-  .glow-green {
-    box-shadow: 0 0 20px hsl(142 60% 45% / 0.15), 0 0 40px hsl(142 60% 45% / 0.05);
-  }
   .glow-cyan {
-    box-shadow: 0 0 20px hsl(199 80% 50% / 0.15), 0 0 40px hsl(199 80% 50% / 0.05);
+    box-shadow: 0 0 20px hsl(195 100% 50% / 0.15), 0 0 60px hsl(195 100% 50% / 0.05);
+  }
+  .glow-green {
+    box-shadow: 0 0 20px hsl(160 84% 39% / 0.15), 0 0 40px hsl(160 84% 39% / 0.05);
   }
   .glow-red {
-    box-shadow: 0 0 20px hsl(0 72% 51% / 0.2), 0 0 40px hsl(0 72% 51% / 0.05);
+    box-shadow: 0 0 20px hsl(0 84% 60% / 0.2), 0 0 40px hsl(0 84% 60% / 0.05);
   }
   .status-pulse {
     animation: pulse-status 2s ease-in-out infinite;
@@ -90,5 +96,19 @@
   @keyframes pulse-status {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+  }
+  .cyber-grid {
+    background-image:
+      linear-gradient(hsl(195 100% 50% / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(195 100% 50% / 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .cyber-border {
+    border: 1px solid hsl(195 100% 50% / 0.15);
+  }
+  .glass {
+    background: hsl(222 40% 8% / 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }
