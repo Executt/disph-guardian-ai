@@ -6,23 +6,24 @@
 
 @layer base {
   :root {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 96%;
+    /* Grafana-inspired: neutral charcoal, less saturated, denser */
+    --background: 220 13% 9%;
+    --foreground: 210 20% 92%;
 
-    --card: 222 40% 8%;
-    --card-foreground: 210 40% 96%;
+    --card: 220 13% 12%;
+    --card-foreground: 210 20% 92%;
 
-    --popover: 222 40% 8%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 220 13% 13%;
+    --popover-foreground: 210 20% 92%;
 
-    --primary: 195 100% 50%;
-    --primary-foreground: 222 47% 5%;
+    --primary: 195 85% 52%;
+    --primary-foreground: 220 13% 9%;
 
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 30% 80%;
+    --secondary: 220 13% 16%;
+    --secondary-foreground: 210 15% 78%;
 
-    --muted: 222 25% 12%;
-    --muted-foreground: 215 20% 50%;
+    --muted: 220 13% 14%;
+    --muted-foreground: 215 12% 55%;
 
     --accent: 160 84% 39%;
     --accent-foreground: 222 47% 5%;
@@ -36,9 +37,9 @@
     --success: 160 84% 39%;
     --success-foreground: 222 47% 5%;
 
-    --border: 222 25% 15%;
-    --input: 222 25% 15%;
-    --ring: 195 100% 50%;
+    --border: 220 13% 18%;
+    --input: 220 13% 18%;
+    --ring: 195 85% 52%;
 
     --radius: 0.5rem;
 
