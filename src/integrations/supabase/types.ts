@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      advisory_environment_assessments: {
+        Row: {
+          advisory_id: string
+          affected_assets: number
+          assessed_at: string | null
+          assessed_by: string | null
+          created_at: string
+          environment_id: string
+          id: string
+          notes: string | null
+          remediated_at: string | null
+          remediation_plan: string | null
+          status: Database["public"]["Enums"]["compliance_status"]
+          updated_at: string
+        }
+        Insert: {
+          advisory_id: string
+          affected_assets?: number
+          assessed_at?: string | null
+          assessed_by?: string | null
+          created_at?: string
+          environment_id: string
+          id?: string
+          notes?: string | null
+          remediated_at?: string | null
+          remediation_plan?: string | null
+          status?: Database["public"]["Enums"]["compliance_status"]
+          updated_at?: string
+        }
+        Update: {
+          advisory_id?: string
+          affected_assets?: number
+          assessed_at?: string | null
+          assessed_by?: string | null
+          created_at?: string
+          environment_id?: string
+          id?: string
+          notes?: string | null
+          remediated_at?: string | null
+          remediation_plan?: string | null
+          status?: Database["public"]["Enums"]["compliance_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisory_environment_assessments_advisory_id_fkey"
+            columns: ["advisory_id"]
+            isOneToOne: false
+            referencedRelation: "ctir_advisories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advisory_environment_assessments_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "monitored_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_conversations: {
         Row: {
           created_at: string
@@ -122,6 +182,63 @@ export type Database = {
         }
         Relationships: []
       }
+      ctir_advisories: {
+        Row: {
+          category: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          cves: string[] | null
+          description: string | null
+          id: string
+          kind: Database["public"]["Enums"]["advisory_kind"]
+          published_at: string | null
+          recommendation: string | null
+          severity: Database["public"]["Enums"]["advisory_severity"]
+          source: string
+          source_url: string | null
+          synced_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          cves?: string[] | null
+          description?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["advisory_kind"]
+          published_at?: string | null
+          recommendation?: string | null
+          severity?: Database["public"]["Enums"]["advisory_severity"]
+          source?: string
+          source_url?: string | null
+          synced_at?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          cves?: string[] | null
+          description?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["advisory_kind"]
+          published_at?: string | null
+          recommendation?: string | null
+          severity?: Database["public"]["Enums"]["advisory_severity"]
+          source?: string
+          source_url?: string | null
+          synced_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       incidents: {
         Row: {
           assigned_to: string | null
@@ -169,6 +286,48 @@ export type Database = {
           source?: string
           status?: Database["public"]["Enums"]["incident_status"]
           title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monitored_environments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criticality: Database["public"]["Enums"]["environment_criticality"]
+          description: string | null
+          id: string
+          name: string
+          owner: string | null
+          tags: string[] | null
+          total_assets: number
+          type: Database["public"]["Enums"]["environment_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criticality?: Database["public"]["Enums"]["environment_criticality"]
+          description?: string | null
+          id?: string
+          name: string
+          owner?: string | null
+          tags?: string[] | null
+          total_assets?: number
+          type?: Database["public"]["Enums"]["environment_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criticality?: Database["public"]["Enums"]["environment_criticality"]
+          description?: string | null
+          id?: string
+          name?: string
+          owner?: string | null
+          tags?: string[] | null
+          total_assets?: number
+          type?: Database["public"]["Enums"]["environment_type"]
           updated_at?: string
         }
         Relationships: []
@@ -251,6 +410,8 @@ export type Database = {
       }
     }
     Enums: {
+      advisory_kind: "alert" | "recommendation"
+      advisory_severity: "critical" | "high" | "medium" | "low"
       app_role: "admin" | "operator" | "viewer" | "auditor"
       cluster_provider:
         | "eks"
@@ -268,6 +429,19 @@ export type Database = {
         | "provisioning"
         | "error"
         | "maintenance"
+      compliance_status:
+        | "compliant"
+        | "partial"
+        | "non_compliant"
+        | "not_applicable"
+        | "pending"
+      environment_criticality: "mission_critical" | "high" | "medium" | "low"
+      environment_type:
+        | "production"
+        | "staging"
+        | "development"
+        | "dr"
+        | "sandbox"
       incident_severity: "critical" | "high" | "medium" | "low"
       incident_status:
         | "open"
@@ -402,6 +576,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      advisory_kind: ["alert", "recommendation"],
+      advisory_severity: ["critical", "high", "medium", "low"],
       app_role: ["admin", "operator", "viewer", "auditor"],
       cluster_provider: [
         "eks",
@@ -420,6 +596,21 @@ export const Constants = {
         "provisioning",
         "error",
         "maintenance",
+      ],
+      compliance_status: [
+        "compliant",
+        "partial",
+        "non_compliant",
+        "not_applicable",
+        "pending",
+      ],
+      environment_criticality: ["mission_critical", "high", "medium", "low"],
+      environment_type: [
+        "production",
+        "staging",
+        "development",
+        "dr",
+        "sandbox",
       ],
       incident_severity: ["critical", "high", "medium", "low"],
       incident_status: [
