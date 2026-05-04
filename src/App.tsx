@@ -14,6 +14,7 @@ import DevSecOpsPage from "@/pages/DevSecOpsPage";
 import InfrastructurePage from "@/pages/InfrastructurePage";
 import AuditPage from "@/pages/AuditPage";
 import AdminPage from "@/pages/AdminPage";
+import ARPage from "@/pages/ARPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             >
               <Route path="/" element={<Index />} />
               <Route path="/incidents" element={<IncidentsPage />} />
+              <Route path="/ar" element={<ARPage />} />
               <Route
                 path="/settings"
                 element={
