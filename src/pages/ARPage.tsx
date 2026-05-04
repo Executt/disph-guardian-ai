@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ShieldAlert, Search, Filter, ExternalLink, CheckCircle2, AlertTriangle,
+  ShieldAlert, Search, ExternalLink, CheckCircle2, AlertTriangle,
   XCircle, Clock, TrendingUp, Database, Server, Lock, FileWarning,
-  Activity, Eye, Zap, BarChart3,
+  Activity, Eye, Zap, BarChart3, Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,122 +17,24 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import type { Database as DB } from "@/integrations/supabase/types";
 
-type Severity = "critical" | "high" | "medium" | "low";
-type Compliance = "compliant" | "partial" | "non_compliant" | "not_applicable";
-type Kind = "alert" | "recommendation";
+type Severity = DB["public"]["Enums"]["advisory_severity"];
+type Compliance = DB["public"]["Enums"]["compliance_status"];
+type Kind = DB["public"]["Enums"]["advisory_kind"];
 
-interface AR {
-  id: string;
-  code: string;
-  kind: Kind;
-  title: string;
-  source: string;
-  publishedAt: string;
-  severity: Severity;
-  category: string;
-  cve?: string[];
+type Advisory = DB["public"]["Tables"]["ctir_advisories"]["Row"];
+type Environment = DB["public"]["Tables"]["monitored_environments"]["Row"];
+type Assessment = DB["public"]["Tables"]["advisory_environment_assessments"]["Row"];
+
+interface AdvisoryView extends Advisory {
   affectedAssets: number;
   totalAssets: number;
-  compliance: Compliance;
-  description: string;
-  recommendation: string;
-  link: string;
+  worstStatus: Compliance;
+  envCount: number;
 }
-
-const MOCK_AR: AR[] = [
-  {
-    id: "1", code: "CTIR-AL-2026-014", kind: "alert",
-    title: "Vulnerabilidade Crítica em Servidores Apache HTTP",
-    source: "CTIR Gov", publishedAt: "2026-04-28",
-    severity: "critical", category: "Web Server",
-    cve: ["CVE-2026-1234", "CVE-2026-1235"],
-    affectedAssets: 12, totalAssets: 47,
-    compliance: "non_compliant",
-    description: "RCE em mod_proxy permite execução remota de código sem autenticação em versões 2.4.x < 2.4.59.",
-    recommendation: "Atualizar imediatamente para Apache HTTP Server 2.4.59 ou superior. Aplicar WAF rule temporária.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/alertas",
-  },
-  {
-    id: "2", code: "CTIR-AL-2026-013", kind: "alert",
-    title: "Campanha de Phishing direcionada a órgãos federais",
-    source: "CTIR Gov", publishedAt: "2026-04-25",
-    severity: "high", category: "Phishing",
-    affectedAssets: 0, totalAssets: 1240,
-    compliance: "compliant",
-    description: "Campanha utilizando domínios typosquatting de gov.br para roubo de credenciais SIAPE.",
-    recommendation: "Reforçar treinamento anti-phishing, habilitar DMARC quarantine, bloquear IOCs no email gateway.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/alertas",
-  },
-  {
-    id: "3", code: "CTIR-RC-2026-008", kind: "recommendation",
-    title: "Hardening de Kubernetes em Produção",
-    source: "CTIR Gov", publishedAt: "2026-04-20",
-    severity: "high", category: "Container Security",
-    affectedAssets: 4, totalAssets: 8,
-    compliance: "partial",
-    description: "Recomendações CIS Kubernetes Benchmark v1.9 para clusters em ambiente governamental.",
-    recommendation: "Habilitar PodSecurityPolicy, NetworkPolicy default-deny, audit logs e RBAC granular.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/recomendacoes",
-  },
-  {
-    id: "4", code: "CTIR-AL-2026-012", kind: "alert",
-    title: "Exploração ativa de OpenSSH CVE-2026-9876",
-    source: "CTIR Gov", publishedAt: "2026-04-18",
-    severity: "critical", category: "SSH",
-    cve: ["CVE-2026-9876"],
-    affectedAssets: 23, totalAssets: 156,
-    compliance: "non_compliant",
-    description: "Pre-auth RCE em OpenSSH < 9.7. Exploits públicos disponíveis e em uso ativo.",
-    recommendation: "Atualizar OpenSSH para 9.7+, restringir SSH a redes confiáveis, habilitar fail2ban.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/alertas",
-  },
-  {
-    id: "5", code: "CTIR-RC-2026-007", kind: "recommendation",
-    title: "Implementação de MFA em sistemas críticos",
-    source: "CTIR Gov", publishedAt: "2026-04-15",
-    severity: "high", category: "IAM",
-    affectedAssets: 2, totalAssets: 8,
-    compliance: "partial",
-    description: "Recomendação SISP para uso obrigatório de MFA em contas administrativas.",
-    recommendation: "Implementar TOTP/FIDO2 em todas as contas privilegiadas. Auditar mensalmente.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/recomendacoes",
-  },
-  {
-    id: "6", code: "CTIR-AL-2026-011", kind: "alert",
-    title: "Ransomware LockBit 5.0 visando setor público",
-    source: "CTIR Gov", publishedAt: "2026-04-10",
-    severity: "critical", category: "Ransomware",
-    affectedAssets: 0, totalAssets: 47,
-    compliance: "compliant",
-    description: "Nova variante LockBit explora RDP exposto e CVE-2026-5555 em VPN gateways.",
-    recommendation: "Validar backups offline, segmentar rede, bloquear RDP externo, atualizar VPN gateways.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/alertas",
-  },
-  {
-    id: "7", code: "CTIR-RC-2026-006", kind: "recommendation",
-    title: "Conformidade LGPD para dados pessoais em logs",
-    source: "CTIR Gov", publishedAt: "2026-04-05",
-    severity: "medium", category: "LGPD",
-    affectedAssets: 18, totalAssets: 52,
-    compliance: "partial",
-    description: "Mascaramento de dados pessoais (CPF, email) em logs aplicacionais e de auditoria.",
-    recommendation: "Implementar log scrubbing, retenção máxima de 6 meses e criptografia em repouso.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/recomendacoes",
-  },
-  {
-    id: "8", code: "CTIR-AL-2026-010", kind: "alert",
-    title: "Vulnerabilidade em PostgreSQL 16.x",
-    source: "CTIR Gov", publishedAt: "2026-04-01",
-    severity: "medium", category: "Database",
-    cve: ["CVE-2026-3322"],
-    affectedAssets: 6, totalAssets: 14,
-    compliance: "partial",
-    description: "Privilege escalation via funções SQL em PostgreSQL 16.0-16.2.",
-    recommendation: "Atualizar para PostgreSQL 16.3+. Revisar grants de funções customizadas.",
-    link: "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes/alertas",
-  },
-];
 
 const SEVERITY_STYLE: Record<Severity, { label: string; cls: string; icon: typeof ShieldAlert }> = {
   critical: { label: "Crítico", cls: "bg-destructive/15 text-destructive border-destructive/30", icon: XCircle },
@@ -146,40 +48,106 @@ const COMPLIANCE_STYLE: Record<Compliance, { label: string; cls: string; icon: t
   partial: { label: "Parcial", cls: "bg-warning/15 text-warning border-warning/30", icon: AlertTriangle },
   non_compliant: { label: "Não Conforme", cls: "bg-destructive/15 text-destructive border-destructive/30", icon: XCircle },
   not_applicable: { label: "N/A", cls: "bg-muted text-muted-foreground border-border", icon: Eye },
+  pending: { label: "Pendente", cls: "bg-secondary text-muted-foreground border-border", icon: Clock },
+};
+
+// Worst-status ranking for rollup per advisory
+const STATUS_RANK: Record<Compliance, number> = {
+  non_compliant: 4, pending: 3, partial: 2, compliant: 1, not_applicable: 0,
 };
 
 export default function ARPage() {
+  const [advisories, setAdvisories] = useState<Advisory[]>([]);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
   const [severity, setSeverity] = useState<string>("all");
   const [kind, setKind] = useState<string>("all");
   const [compliance, setCompliance] = useState<string>("all");
-  const [selected, setSelected] = useState<AR | null>(null);
+  const [envFilter, setEnvFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<AdvisoryView | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      const [a, e, s] = await Promise.all([
+        supabase.from("ctir_advisories").select("*").order("published_at", { ascending: false }),
+        supabase.from("monitored_environments").select("*").order("name"),
+        supabase.from("advisory_environment_assessments").select("*"),
+      ]);
+      if (cancel) return;
+      if (a.error || e.error || s.error) {
+        toast({ title: "Erro ao carregar dados", description: a.error?.message ?? e.error?.message ?? s.error?.message, variant: "destructive" });
+      }
+      setAdvisories(a.data ?? []);
+      setEnvironments(e.data ?? []);
+      setAssessments(s.data ?? []);
+      setLoading(false);
+    })();
+    return () => { cancel = true; };
+  }, []);
+
+  // Compose enriched advisory views (with cross-env rollup)
+  const views: AdvisoryView[] = useMemo(() => {
+    return advisories.map((adv) => {
+      const related = assessments.filter((x) => x.advisory_id === adv.id &&
+        (envFilter === "all" || x.environment_id === envFilter));
+      const affectedAssets = related.reduce((s, x) => s + (x.affected_assets ?? 0), 0);
+      const totalAssets = related.reduce((sum, x) => {
+        const env = environments.find((e) => e.id === x.environment_id);
+        return sum + (env?.total_assets ?? 0);
+      }, 0);
+      const worstStatus = related.reduce<Compliance>((acc, x) =>
+        STATUS_RANK[x.status] > STATUS_RANK[acc] ? x.status : acc, "not_applicable");
+      return { ...adv, affectedAssets, totalAssets, worstStatus, envCount: related.length };
+    });
+  }, [advisories, assessments, environments, envFilter]);
 
   const filtered = useMemo(() => {
-    return MOCK_AR.filter((a) => {
+    return views.filter((a) => {
+      if (envFilter !== "all" && a.envCount === 0) return false;
       if (search && !a.title.toLowerCase().includes(search.toLowerCase()) &&
           !a.code.toLowerCase().includes(search.toLowerCase())) return false;
       if (severity !== "all" && a.severity !== severity) return false;
       if (kind !== "all" && a.kind !== kind) return false;
-      if (compliance !== "all" && a.compliance !== compliance) return false;
+      if (compliance !== "all" && a.worstStatus !== compliance) return false;
       return true;
     });
-  }, [search, severity, kind, compliance]);
+  }, [views, search, severity, kind, compliance, envFilter]);
 
   const stats = useMemo(() => {
-    const total = MOCK_AR.length;
-    const critical = MOCK_AR.filter((a) => a.severity === "critical").length;
-    const nonCompliant = MOCK_AR.filter((a) => a.compliance === "non_compliant").length;
-    const partial = MOCK_AR.filter((a) => a.compliance === "partial").length;
-    const compliant = MOCK_AR.filter((a) => a.compliance === "compliant").length;
-    const totalAffected = MOCK_AR.reduce((s, a) => s + a.affectedAssets, 0);
-    const score = Math.round((compliant / total) * 100);
+    const total = views.length;
+    const critical = views.filter((a) => a.severity === "critical").length;
+    const nonCompliant = views.filter((a) => a.worstStatus === "non_compliant").length;
+    const partial = views.filter((a) => a.worstStatus === "partial").length;
+    const compliant = views.filter((a) => a.worstStatus === "compliant").length;
+    const totalAffected = views.reduce((s, a) => s + a.affectedAssets, 0);
+    const score = total ? Math.round((compliant / total) * 100) : 0;
     return { total, critical, nonCompliant, partial, compliant, totalAffected, score };
-  }, []);
+  }, [views]);
+
+  const selectedAssessments = useMemo(() => {
+    if (!selected) return [];
+    return assessments
+      .filter((x) => x.advisory_id === selected.id)
+      .map((x) => ({ ...x, env: environments.find((e) => e.id === x.environment_id) }));
+  }, [selected, assessments, environments]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] gap-3 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="font-mono text-xs">Carregando alertas e ambientes...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Hero / Header inspirado em Trend Vision One */}
+      {/* Hero */}
       <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-8">
         <div className="absolute inset-0 cyber-grid opacity-30 pointer-events-none" />
         <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -189,19 +157,19 @@ export default function ARPage() {
                 MÓDULO AR · CTIR Gov
               </Badge>
               <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30 font-mono text-[10px]">
-                <Activity className="h-3 w-3 mr-1" /> SYNC ATIVO
+                <Activity className="h-3 w-3 mr-1" /> {environments.length} AMBIENTES
               </Badge>
             </div>
             <h1 className="heading text-3xl lg:text-4xl font-bold mb-3 tracking-tight">
               Alertas e Recomendações
             </h1>
             <p className="text-muted-foreground text-sm lg:text-base mb-4">
-              Descubra, classifique, rastreie e correlacione alertas do CTIR Gov com o ambiente monitorado.
-              Análise cruzada em tempo real com priorização inteligente de riscos e resposta orientada a compliance.
+              Catálogo CTIR persistido em PostgreSQL e correlacionado em tempo real com os ambientes monitorados.
+              Análise cruzada com priorização por severidade e gap de compliance.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" className="gap-2">
-                <Zap className="h-4 w-4" /> Executar Análise Cruzada
+                <Zap className="h-4 w-4" /> Sincronizar com CTIR
               </Button>
               <Button size="sm" variant="outline" className="gap-2" asChild>
                 <a href="https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes" target="_blank" rel="noopener noreferrer">
@@ -210,7 +178,6 @@ export default function ARPage() {
               </Button>
             </div>
           </div>
-          {/* Score card */}
           <Card className="w-full lg:w-80 shrink-0 border-primary/20 bg-card/80 backdrop-blur">
             <CardHeader className="pb-2">
               <CardDescription className="font-mono text-[10px] tracking-wider">SECURITY POSTURE SCORE</CardDescription>
@@ -231,7 +198,7 @@ export default function ARPage() {
         </div>
       </div>
 
-      {/* KPI cards */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={ShieldAlert} label="Total Alertas/Recs" value={stats.total} hint="Sincronizados CTIR" tone="primary" />
         <KpiCard icon={XCircle} label="Severidade Crítica" value={stats.critical} hint="Ação imediata" tone="destructive" />
@@ -239,15 +206,15 @@ export default function ARPage() {
         <KpiCard icon={Server} label="Ativos Afetados" value={stats.totalAffected} hint="Cross-env exposure" tone="accent" />
       </div>
 
-      {/* Tabs principais */}
+      {/* Tabs */}
       <Tabs defaultValue="cross" className="space-y-4">
         <TabsList className="grid grid-cols-3 lg:w-[600px]">
           <TabsTrigger value="cross" className="gap-2"><BarChart3 className="h-3.5 w-3.5" /> Análise Cruzada</TabsTrigger>
           <TabsTrigger value="catalog" className="gap-2"><Database className="h-3.5 w-3.5" /> Catálogo CTIR</TabsTrigger>
-          <TabsTrigger value="coverage" className="gap-2"><Lock className="h-3.5 w-3.5" /> Cobertura</TabsTrigger>
+          <TabsTrigger value="environments" className="gap-2"><Lock className="h-3.5 w-3.5" /> Ambientes</TabsTrigger>
         </TabsList>
 
-        {/* === Análise Cruzada === */}
+        {/* Análise Cruzada */}
         <TabsContent value="cross" className="space-y-4">
           <Card>
             <CardHeader>
@@ -266,6 +233,15 @@ export default function ARPage() {
                       className="h-9 pl-8 w-56 text-xs"
                     />
                   </div>
+                  <Select value={envFilter} onValueChange={setEnvFilter}>
+                    <SelectTrigger className="h-9 w-44 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos ambientes</SelectItem>
+                      {environments.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={kind} onValueChange={setKind}>
                     <SelectTrigger className="h-9 w-32 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -291,6 +267,7 @@ export default function ARPage() {
                       <SelectItem value="compliant">Conforme</SelectItem>
                       <SelectItem value="partial">Parcial</SelectItem>
                       <SelectItem value="non_compliant">Não Conforme</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -312,7 +289,7 @@ export default function ARPage() {
                 <TableBody>
                   {filtered.map((a) => {
                     const SevIcon = SEVERITY_STYLE[a.severity].icon;
-                    const CompIcon = COMPLIANCE_STYLE[a.compliance].icon;
+                    const CompIcon = COMPLIANCE_STYLE[a.worstStatus].icon;
                     const exposure = a.totalAssets > 0 ? Math.round((a.affectedAssets / a.totalAssets) * 100) : 0;
                     return (
                       <TableRow key={a.id} className="cursor-pointer" onClick={() => setSelected(a)}>
@@ -333,7 +310,7 @@ export default function ARPage() {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{a.category}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2 min-w-[120px]">
+                          <div className="flex items-center gap-2 min-w-[140px]">
                             <Progress value={exposure} className="h-1.5 flex-1" />
                             <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
                               {a.affectedAssets}/{a.totalAssets}
@@ -341,9 +318,9 @@ export default function ARPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`text-[10px] font-mono uppercase gap-1 ${COMPLIANCE_STYLE[a.compliance].cls}`}>
+                          <Badge variant="outline" className={`text-[10px] font-mono uppercase gap-1 ${COMPLIANCE_STYLE[a.worstStatus].cls}`}>
                             <CompIcon className="h-3 w-3" />
-                            {COMPLIANCE_STYLE[a.compliance].label}
+                            {COMPLIANCE_STYLE[a.worstStatus].label}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -365,7 +342,7 @@ export default function ARPage() {
           </Card>
         </TabsContent>
 
-        {/* === Catálogo === */}
+        {/* Catálogo */}
         <TabsContent value="catalog" className="space-y-4">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((a) => {
@@ -383,23 +360,25 @@ export default function ARPage() {
                       </Badge>
                     </div>
                     <CardTitle className="text-sm leading-snug heading">{a.title}</CardTitle>
-                    <CardDescription className="font-mono text-[10px]">{a.code} · {a.publishedAt}</CardDescription>
+                    <CardDescription className="font-mono text-[10px]">
+                      {a.code} · {a.published_at?.slice(0, 10) ?? "—"}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-xs text-muted-foreground line-clamp-2">{a.description}</p>
-                    {a.cve && (
+                    {a.cves && a.cves.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {a.cve.map((c) => (
+                        {a.cves.map((c) => (
                           <Badge key={c} variant="outline" className="text-[9px] font-mono">{c}</Badge>
                         ))}
                       </div>
                     )}
                     <div className="flex items-center justify-between pt-2 border-t border-border">
                       <span className="text-[10px] font-mono text-muted-foreground">
-                        {a.affectedAssets}/{a.totalAssets} ativos
+                        {a.envCount} amb · {a.affectedAssets}/{a.totalAssets} ativos
                       </span>
-                      <Badge variant="outline" className={`text-[10px] font-mono ${COMPLIANCE_STYLE[a.compliance].cls}`}>
-                        {COMPLIANCE_STYLE[a.compliance].label}
+                      <Badge variant="outline" className={`text-[10px] font-mono ${COMPLIANCE_STYLE[a.worstStatus].cls}`}>
+                        {COMPLIANCE_STYLE[a.worstStatus].label}
                       </Badge>
                     </div>
                   </CardContent>
@@ -409,41 +388,58 @@ export default function ARPage() {
           </div>
         </TabsContent>
 
-        {/* === Cobertura === */}
-        <TabsContent value="coverage" className="space-y-4">
-          <div className="grid md:grid-cols-3 gap-4">
-            <CoverageCard title="Conformes" count={stats.compliant} total={stats.total} tone="accent" icon={CheckCircle2} />
-            <CoverageCard title="Conformidade Parcial" count={stats.partial} total={stats.total} tone="warning" icon={AlertTriangle} />
-            <CoverageCard title="Não Conformes" count={stats.nonCompliant} total={stats.total} tone="destructive" icon={XCircle} />
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="heading text-lg">Cobertura por Categoria</CardTitle>
-              <CardDescription>Mapeamento de domínios técnicos vs. alertas CTIR ativos</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {Array.from(new Set(MOCK_AR.map((a) => a.category))).map((cat) => {
-                const items = MOCK_AR.filter((a) => a.category === cat);
-                const ok = items.filter((a) => a.compliance === "compliant").length;
-                const pct = Math.round((ok / items.length) * 100);
-                return (
-                  <div key={cat} className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-medium">{cat}</span>
-                      <span className="font-mono text-muted-foreground">{ok}/{items.length} conformes ({pct}%)</span>
+        {/* Ambientes */}
+        <TabsContent value="environments" className="space-y-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {environments.map((env) => {
+              const envAssessments = assessments.filter((x) => x.environment_id === env.id);
+              const compliant = envAssessments.filter((x) => x.status === "compliant").length;
+              const total = envAssessments.length;
+              const pct = total ? Math.round((compliant / total) * 100) : 0;
+              const affected = envAssessments.reduce((s, x) => s + (x.affected_assets ?? 0), 0);
+              return (
+                <Card key={env.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-base heading">{env.name}</CardTitle>
+                        <CardDescription className="text-xs">{env.description}</CardDescription>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] font-mono uppercase">{env.type}</Badge>
                     </div>
-                    <Progress value={pct} className="h-2" />
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-lg font-bold heading">{env.total_assets}</p>
+                        <p className="text-[9px] font-mono uppercase text-muted-foreground">Ativos</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold heading text-destructive">{affected}</p>
+                        <p className="text-[9px] font-mono uppercase text-muted-foreground">Afetados</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold heading text-accent">{pct}%</p>
+                        <p className="text-[9px] font-mono uppercase text-muted-foreground">Conforme</p>
+                      </div>
+                    </div>
+                    <Progress value={pct} className="h-1.5" />
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {(env.tags ?? []).map((t) => (
+                        <Badge key={t} variant="outline" className="text-[9px] font-mono">{t}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </TabsContent>
       </Tabs>
 
       {/* Dialog detalhe */}
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           {selected && (
             <>
               <DialogHeader>
@@ -452,13 +448,13 @@ export default function ARPage() {
                   <Badge variant="outline" className={`font-mono text-[10px] ${SEVERITY_STYLE[selected.severity].cls}`}>
                     {SEVERITY_STYLE[selected.severity].label}
                   </Badge>
-                  <Badge variant="outline" className={`font-mono text-[10px] ${COMPLIANCE_STYLE[selected.compliance].cls}`}>
-                    {COMPLIANCE_STYLE[selected.compliance].label}
+                  <Badge variant="outline" className={`font-mono text-[10px] ${COMPLIANCE_STYLE[selected.worstStatus].cls}`}>
+                    {COMPLIANCE_STYLE[selected.worstStatus].label}
                   </Badge>
                 </div>
                 <DialogTitle className="heading">{selected.title}</DialogTitle>
                 <DialogDescription className="font-mono text-xs">
-                  {selected.source} · Publicado em {selected.publishedAt}
+                  {selected.source} · Publicado em {selected.published_at?.slice(0, 10) ?? "—"}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 text-sm">
@@ -470,33 +466,65 @@ export default function ARPage() {
                   <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Recomendação</h4>
                   <p className="text-muted-foreground">{selected.recommendation}</p>
                 </section>
-                {selected.cve && (
+                {selected.cves && selected.cves.length > 0 && (
                   <section>
                     <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">CVEs</h4>
                     <div className="flex flex-wrap gap-1">
-                      {selected.cve.map((c) => (
+                      {selected.cves.map((c) => (
                         <Badge key={c} variant="outline" className="font-mono text-xs">{c}</Badge>
                       ))}
                     </div>
                   </section>
                 )}
-                <section className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Ativos afetados</p>
-                    <p className="text-2xl font-bold heading text-destructive">{selected.affectedAssets}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Ativos totais</p>
-                    <p className="text-2xl font-bold heading">{selected.totalAssets}</p>
+                <section>
+                  <h4 className="font-semibold mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+                    Avaliação por Ambiente
+                  </h4>
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="font-mono text-[10px] uppercase">Ambiente</TableHead>
+                          <TableHead className="font-mono text-[10px] uppercase">Status</TableHead>
+                          <TableHead className="font-mono text-[10px] uppercase text-right">Afetados</TableHead>
+                          <TableHead className="font-mono text-[10px] uppercase">Notas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedAssessments.map((x) => (
+                          <TableRow key={x.id}>
+                            <TableCell className="text-xs">{x.env?.name ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={`text-[10px] font-mono ${COMPLIANCE_STYLE[x.status].cls}`}>
+                                {COMPLIANCE_STYLE[x.status].label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs">
+                              {x.affected_assets} / {x.env?.total_assets ?? 0}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{x.notes ?? "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                        {selectedAssessments.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-4">
+                              Nenhuma avaliação registrada para este advisory.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 </section>
                 <div className="flex gap-2 pt-2">
                   <Button size="sm" className="gap-2"><Zap className="h-3.5 w-3.5" /> Criar Plano de Remediação</Button>
-                  <Button size="sm" variant="outline" className="gap-2" asChild>
-                    <a href={selected.link} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5" /> Ver no CTIR
-                    </a>
-                  </Button>
+                  {selected.source_url && (
+                    <Button size="sm" variant="outline" className="gap-2" asChild>
+                      <a href={selected.source_url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5" /> Ver no CTIR
+                      </a>
+                    </Button>
+                  )}
                 </div>
               </div>
             </>
@@ -529,34 +557,6 @@ function KpiCard({ icon: Icon, label, value, hint, tone }: {
         <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
         <p className="text-2xl font-bold heading">{value}</p>
         <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CoverageCard({ title, count, total, tone, icon: Icon }: {
-  title: string; count: number; total: number;
-  tone: "accent" | "warning" | "destructive";
-  icon: typeof CheckCircle2;
-}) {
-  const pct = Math.round((count / total) * 100);
-  const toneCls = {
-    accent: "text-accent",
-    warning: "text-warning",
-    destructive: "text-destructive",
-  }[tone];
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <Icon className={`h-5 w-5 ${toneCls}`} />
-          <span className="text-sm font-medium">{title}</span>
-        </div>
-        <div className="flex items-baseline gap-2 mb-2">
-          <span className={`text-3xl font-bold heading ${toneCls}`}>{count}</span>
-          <span className="text-xs text-muted-foreground">/ {total} ({pct}%)</span>
-        </div>
-        <Progress value={pct} className="h-1.5" />
       </CardContent>
     </Card>
   );
