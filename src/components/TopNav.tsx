@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, AlertTriangle, Server, Shield, ShieldCheck,
-  Settings, LogOut, User, ChevronDown, Menu, X, Brain, Users
+  Settings, LogOut, User, ChevronDown, Menu, X, Brain, Users, ShieldAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 const navItems = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
   { label: "Incidentes", path: "/incidents", icon: AlertTriangle },
+  { label: "AR", path: "/ar", icon: ShieldAlert },
   { label: "Infraestrutura", path: "/infrastructure", icon: Server },
   { label: "DevSecOps", path: "/devsecops", icon: Shield },
   { label: "Auditoria", path: "/audit", icon: ShieldCheck },
