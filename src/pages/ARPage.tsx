@@ -82,7 +82,9 @@ export default function ARPage() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [syncStates, setSyncStates] = useState<SyncState[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   const [search, setSearch] = useState("");
   const [severity, setSeverity] = useState<string>("all");
@@ -91,26 +93,47 @@ export default function ARPage() {
   const [envFilter, setEnvFilter] = useState<string>("all");
   const [selected, setSelected] = useState<AdvisoryView | null>(null);
 
+  async function loadAll() {
+    const [a, e, s, st] = await Promise.all([
+      supabase.from("ctir_advisories").select("*").order("published_at", { ascending: false }),
+      supabase.from("monitored_environments").select("*").order("name"),
+      supabase.from("advisory_environment_assessments").select("*"),
+      supabase.from("ctir_sync_state").select("*").order("last_fetched_at", { ascending: false }),
+    ]);
+    if (a.error || e.error || s.error) {
+      toast({ title: "Erro ao carregar dados", description: a.error?.message ?? e.error?.message ?? s.error?.message, variant: "destructive" });
+    }
+    setAdvisories(a.data ?? []);
+    setEnvironments(e.data ?? []);
+    setAssessments(s.data ?? []);
+    setSyncStates(st.data ?? []);
+  }
+
   useEffect(() => {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const [a, e, s] = await Promise.all([
-        supabase.from("ctir_advisories").select("*").order("published_at", { ascending: false }),
-        supabase.from("monitored_environments").select("*").order("name"),
-        supabase.from("advisory_environment_assessments").select("*"),
-      ]);
-      if (cancel) return;
-      if (a.error || e.error || s.error) {
-        toast({ title: "Erro ao carregar dados", description: a.error?.message ?? e.error?.message ?? s.error?.message, variant: "destructive" });
-      }
-      setAdvisories(a.data ?? []);
-      setEnvironments(e.data ?? []);
-      setAssessments(s.data ?? []);
-      setLoading(false);
+      await loadAll();
+      if (!cancel) setLoading(false);
     })();
     return () => { cancel = true; };
   }, []);
+
+  async function runSync(force = false) {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-ctir-advisories", {
+        body: { force },
+      });
+      if (error) throw error;
+      toast({ title: "Sincronização concluída", description: `Inseridos: ${data?.inserted ?? 0} · Atualizados: ${data?.updated ?? 0} · Pulados: ${data?.skipped ?? 0}` });
+      await loadAll();
+    } catch (err: any) {
+      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   // Compose enriched advisory views (with cross-env rollup)
   const views: AdvisoryView[] = useMemo(() => {
