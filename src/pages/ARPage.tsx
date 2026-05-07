@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { Database as DB } from "@/integrations/supabase/types";
+import { RefreshCw, Rss } from "lucide-react";
 
 type Severity = DB["public"]["Enums"]["advisory_severity"];
 type Compliance = DB["public"]["Enums"]["compliance_status"];
@@ -28,6 +29,27 @@ type Kind = DB["public"]["Enums"]["advisory_kind"];
 type Advisory = DB["public"]["Tables"]["ctir_advisories"]["Row"];
 type Environment = DB["public"]["Tables"]["monitored_environments"]["Row"];
 type Assessment = DB["public"]["Tables"]["advisory_environment_assessments"]["Row"];
+type SyncState = DB["public"]["Tables"]["ctir_sync_state"]["Row"];
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s atrás`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}min atrás`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h atrás`;
+  return `${Math.floor(h / 24)}d atrás`;
+}
+
+function statusTone(status: number | null): string {
+  if (!status) return "bg-muted text-muted-foreground border-border";
+  if (status === 304) return "bg-accent/15 text-accent border-accent/30";
+  if (status >= 200 && status < 300) return "bg-primary/15 text-primary border-primary/30";
+  if (status >= 400) return "bg-destructive/15 text-destructive border-destructive/30";
+  return "bg-warning/15 text-warning border-warning/30";
+}
 
 interface AdvisoryView extends Advisory {
   affectedAssets: number;
