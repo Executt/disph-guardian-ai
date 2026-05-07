@@ -692,7 +692,7 @@ export default function ARPage() {
 }
 
 function KpiCard({ icon: Icon, label, value, hint, tone }: {
-  icon: typeof ShieldAlert; label: string; value: number; hint: string;
+  icon: typeof ShieldAlert; label: string; value: number | string; hint: string;
   tone: "primary" | "destructive" | "warning" | "accent";
 }) {
   const toneCls = {
