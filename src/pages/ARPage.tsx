@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { Database as DB } from "@/integrations/supabase/types";
+import { RefreshCw, Rss } from "lucide-react";
 
 type Severity = DB["public"]["Enums"]["advisory_severity"];
 type Compliance = DB["public"]["Enums"]["compliance_status"];
@@ -28,6 +29,27 @@ type Kind = DB["public"]["Enums"]["advisory_kind"];
 type Advisory = DB["public"]["Tables"]["ctir_advisories"]["Row"];
 type Environment = DB["public"]["Tables"]["monitored_environments"]["Row"];
 type Assessment = DB["public"]["Tables"]["advisory_environment_assessments"]["Row"];
+type SyncState = DB["public"]["Tables"]["ctir_sync_state"]["Row"];
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s atrás`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}min atrás`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h atrás`;
+  return `${Math.floor(h / 24)}d atrás`;
+}
+
+function statusTone(status: number | null): string {
+  if (!status) return "bg-muted text-muted-foreground border-border";
+  if (status === 304) return "bg-accent/15 text-accent border-accent/30";
+  if (status >= 200 && status < 300) return "bg-primary/15 text-primary border-primary/30";
+  if (status >= 400) return "bg-destructive/15 text-destructive border-destructive/30";
+  return "bg-warning/15 text-warning border-warning/30";
+}
 
 interface AdvisoryView extends Advisory {
   affectedAssets: number;
@@ -60,7 +82,9 @@ export default function ARPage() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [syncStates, setSyncStates] = useState<SyncState[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   const [search, setSearch] = useState("");
   const [severity, setSeverity] = useState<string>("all");
@@ -69,26 +93,47 @@ export default function ARPage() {
   const [envFilter, setEnvFilter] = useState<string>("all");
   const [selected, setSelected] = useState<AdvisoryView | null>(null);
 
+  async function loadAll() {
+    const [a, e, s, st] = await Promise.all([
+      supabase.from("ctir_advisories").select("*").order("published_at", { ascending: false }),
+      supabase.from("monitored_environments").select("*").order("name"),
+      supabase.from("advisory_environment_assessments").select("*"),
+      supabase.from("ctir_sync_state").select("*").order("last_fetched_at", { ascending: false }),
+    ]);
+    if (a.error || e.error || s.error) {
+      toast({ title: "Erro ao carregar dados", description: a.error?.message ?? e.error?.message ?? s.error?.message, variant: "destructive" });
+    }
+    setAdvisories(a.data ?? []);
+    setEnvironments(e.data ?? []);
+    setAssessments(s.data ?? []);
+    setSyncStates(st.data ?? []);
+  }
+
   useEffect(() => {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const [a, e, s] = await Promise.all([
-        supabase.from("ctir_advisories").select("*").order("published_at", { ascending: false }),
-        supabase.from("monitored_environments").select("*").order("name"),
-        supabase.from("advisory_environment_assessments").select("*"),
-      ]);
-      if (cancel) return;
-      if (a.error || e.error || s.error) {
-        toast({ title: "Erro ao carregar dados", description: a.error?.message ?? e.error?.message ?? s.error?.message, variant: "destructive" });
-      }
-      setAdvisories(a.data ?? []);
-      setEnvironments(e.data ?? []);
-      setAssessments(s.data ?? []);
-      setLoading(false);
+      await loadAll();
+      if (!cancel) setLoading(false);
     })();
     return () => { cancel = true; };
   }, []);
+
+  async function runSync(force = false) {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-ctir-advisories", {
+        body: { force },
+      });
+      if (error) throw error;
+      toast({ title: "Sincronização concluída", description: `Inseridos: ${data?.inserted ?? 0} · Atualizados: ${data?.updated ?? 0} · Pulados: ${data?.skipped ?? 0}` });
+      await loadAll();
+    } catch (err: any) {
+      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   // Compose enriched advisory views (with cross-env rollup)
   const views: AdvisoryView[] = useMemo(() => {
@@ -208,10 +253,11 @@ export default function ARPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="cross" className="space-y-4">
-        <TabsList className="grid grid-cols-3 lg:w-[600px]">
+        <TabsList className="grid grid-cols-4 lg:w-[760px]">
           <TabsTrigger value="cross" className="gap-2"><BarChart3 className="h-3.5 w-3.5" /> Análise Cruzada</TabsTrigger>
           <TabsTrigger value="catalog" className="gap-2"><Database className="h-3.5 w-3.5" /> Catálogo CTIR</TabsTrigger>
           <TabsTrigger value="environments" className="gap-2"><Lock className="h-3.5 w-3.5" /> Ambientes</TabsTrigger>
+          <TabsTrigger value="sync" className="gap-2"><Rss className="h-3.5 w-3.5" /> Sincronização</TabsTrigger>
         </TabsList>
 
         {/* Análise Cruzada */}
@@ -435,6 +481,116 @@ export default function ARPage() {
             })}
           </div>
         </TabsContent>
+
+        {/* Sincronização */}
+        <TabsContent value="sync" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div>
+                  <CardTitle className="heading text-lg">Status de Sincronização por Feed</CardTitle>
+                  <CardDescription>
+                    Cache HTTP condicional (ETag / Last-Modified) e cutoff por <code className="font-mono">published_at</code> para sincronização incremental.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => loadAll()} className="gap-2">
+                    <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+                  </Button>
+                  <Button size="sm" onClick={() => runSync(false)} disabled={syncing} className="gap-2">
+                    {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                    Sincronizar agora
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => runSync(true)} disabled={syncing} className="gap-2">
+                    Forçar full
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {syncStates.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-12">
+                  Nenhum estado de sincronização registrado ainda. Execute "Sincronizar agora" para popular.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Feed</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">HTTP</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">ETag</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Last-Modified</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Último item (published_at)</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider text-right">Itens</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider text-right">Última execução</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {syncStates.map((s) => {
+                      const feedLabel = s.feed_url
+                        .replace("https://www.gov.br/ctir/pt-br/assuntos/", "")
+                        .replace("/RSS", "");
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-mono text-xs">
+                            <a href={s.feed_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                              {feedLabel} <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`text-[10px] font-mono ${statusTone(s.last_status)}`}>
+                              {s.last_status ?? "—"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px] text-muted-foreground max-w-[180px] truncate" title={s.etag ?? ""}>
+                            {s.etag ?? "—"}
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px] text-muted-foreground max-w-[180px] truncate" title={s.last_modified ?? ""}>
+                            {s.last_modified ?? "—"}
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px] text-muted-foreground">
+                            {s.last_item_published_at
+                              ? new Date(s.last_item_published_at).toLocaleString("pt-BR")
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs">{s.items_seen}</TableCell>
+                          <TableCell className="text-right font-mono text-[10px] text-muted-foreground" title={new Date(s.last_fetched_at).toLocaleString("pt-BR")}>
+                            {timeAgo(s.last_fetched_at)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard icon={Rss} label="Feeds rastreados" value={syncStates.length} hint="ETag + Last-Modified" tone="primary" />
+            <KpiCard
+              icon={CheckCircle2}
+              label="Cache hits (304)"
+              value={syncStates.filter((s) => s.last_status === 304).length}
+              hint="Sem alteração no feed"
+              tone="accent"
+            />
+            <KpiCard
+              icon={Activity}
+              label="Itens vistos"
+              value={syncStates.reduce((s, x) => s + (x.items_seen ?? 0), 0)}
+              hint="Acumulado por feed"
+              tone="warning"
+            />
+            <KpiCard
+              icon={Clock}
+              label="Última execução"
+              value={syncStates[0] ? timeAgo(syncStates[0].last_fetched_at) : "—"}
+              hint="Feed mais recente"
+              tone="primary"
+            />
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Dialog detalhe */}
@@ -536,7 +692,7 @@ export default function ARPage() {
 }
 
 function KpiCard({ icon: Icon, label, value, hint, tone }: {
-  icon: typeof ShieldAlert; label: string; value: number; hint: string;
+  icon: typeof ShieldAlert; label: string; value: number | string; hint: string;
   tone: "primary" | "destructive" | "warning" | "accent";
 }) {
   const toneCls = {
