@@ -481,6 +481,116 @@ export default function ARPage() {
             })}
           </div>
         </TabsContent>
+
+        {/* Sincronização */}
+        <TabsContent value="sync" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div>
+                  <CardTitle className="heading text-lg">Status de Sincronização por Feed</CardTitle>
+                  <CardDescription>
+                    Cache HTTP condicional (ETag / Last-Modified) e cutoff por <code className="font-mono">published_at</code> para sincronização incremental.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => loadAll()} className="gap-2">
+                    <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+                  </Button>
+                  <Button size="sm" onClick={() => runSync(false)} disabled={syncing} className="gap-2">
+                    {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                    Sincronizar agora
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => runSync(true)} disabled={syncing} className="gap-2">
+                    Forçar full
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {syncStates.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-12">
+                  Nenhum estado de sincronização registrado ainda. Execute "Sincronizar agora" para popular.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Feed</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">HTTP</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">ETag</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Last-Modified</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Último item (published_at)</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider text-right">Itens</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider text-right">Última execução</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {syncStates.map((s) => {
+                      const feedLabel = s.feed_url
+                        .replace("https://www.gov.br/ctir/pt-br/assuntos/", "")
+                        .replace("/RSS", "");
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-mono text-xs">
+                            <a href={s.feed_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                              {feedLabel} <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`text-[10px] font-mono ${statusTone(s.last_status)}`}>
+                              {s.last_status ?? "—"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px] text-muted-foreground max-w-[180px] truncate" title={s.etag ?? ""}>
+                            {s.etag ?? "—"}
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px] text-muted-foreground max-w-[180px] truncate" title={s.last_modified ?? ""}>
+                            {s.last_modified ?? "—"}
+                          </TableCell>
+                          <TableCell className="font-mono text-[10px] text-muted-foreground">
+                            {s.last_item_published_at
+                              ? new Date(s.last_item_published_at).toLocaleString("pt-BR")
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs">{s.items_seen}</TableCell>
+                          <TableCell className="text-right font-mono text-[10px] text-muted-foreground" title={new Date(s.last_fetched_at).toLocaleString("pt-BR")}>
+                            {timeAgo(s.last_fetched_at)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard icon={Rss} label="Feeds rastreados" value={syncStates.length} hint="ETag + Last-Modified" tone="primary" />
+            <KpiCard
+              icon={CheckCircle2}
+              label="Cache hits (304)"
+              value={syncStates.filter((s) => s.last_status === 304).length}
+              hint="Sem alteração no feed"
+              tone="accent"
+            />
+            <KpiCard
+              icon={Activity}
+              label="Itens vistos"
+              value={syncStates.reduce((s, x) => s + (x.items_seen ?? 0), 0)}
+              hint="Acumulado por feed"
+              tone="warning"
+            />
+            <KpiCard
+              icon={Clock}
+              label="Última execução"
+              value={syncStates[0] ? timeAgo(syncStates[0].last_fetched_at) : "—"}
+              hint="Feed mais recente"
+              tone="primary"
+            />
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Dialog detalhe */}
