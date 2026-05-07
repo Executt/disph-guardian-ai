@@ -239,6 +239,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ctir_sync_state: {
+        Row: {
+          created_at: string
+          etag: string | null
+          feed_url: string
+          id: string
+          items_seen: number
+          last_fetched_at: string
+          last_item_published_at: string | null
+          last_modified: string | null
+          last_status: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          etag?: string | null
+          feed_url: string
+          id?: string
+          items_seen?: number
+          last_fetched_at?: string
+          last_item_published_at?: string | null
+          last_modified?: string | null
+          last_status?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          etag?: string | null
+          feed_url?: string
+          id?: string
+          items_seen?: number
+          last_fetched_at?: string
+          last_item_published_at?: string | null
+          last_modified?: string | null
+          last_status?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       incidents: {
         Row: {
           assigned_to: string | null
