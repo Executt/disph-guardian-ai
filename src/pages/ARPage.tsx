@@ -253,10 +253,11 @@ export default function ARPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="cross" className="space-y-4">
-        <TabsList className="grid grid-cols-3 lg:w-[600px]">
+        <TabsList className="grid grid-cols-4 lg:w-[760px]">
           <TabsTrigger value="cross" className="gap-2"><BarChart3 className="h-3.5 w-3.5" /> Análise Cruzada</TabsTrigger>
           <TabsTrigger value="catalog" className="gap-2"><Database className="h-3.5 w-3.5" /> Catálogo CTIR</TabsTrigger>
           <TabsTrigger value="environments" className="gap-2"><Lock className="h-3.5 w-3.5" /> Ambientes</TabsTrigger>
+          <TabsTrigger value="sync" className="gap-2"><Rss className="h-3.5 w-3.5" /> Sincronização</TabsTrigger>
         </TabsList>
 
         {/* Análise Cruzada */}
