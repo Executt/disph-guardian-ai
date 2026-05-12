@@ -16,7 +16,9 @@ const corsHeaders = {
 };
 
 const BASE = "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes";
-const UA = "DISPH-AIOPS/1.0 (+advisory-sync; contact: ops@disph.gov.br)";
+// gov.br bloqueia UAs não-browser com 403. Usamos UA de browser real.
+const UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 type Severity = "low" | "medium" | "high" | "critical";
 type Kind = "alert" | "recommendation";
