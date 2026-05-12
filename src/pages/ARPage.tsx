@@ -56,6 +56,11 @@ interface AdvisoryView extends Advisory {
   totalAssets: number;
   worstStatus: Compliance;
   envCount: number;
+  sortYear: number;
+  sortNum: number;
+  sortSource: "code" | "published_at" | "fallback";
+  publishedYear: number | null;
+  divergent: boolean;
 }
 
 const SEVERITY_STYLE: Record<Severity, { label: string; cls: string; icon: typeof ShieldAlert }> = {
@@ -169,7 +174,16 @@ export default function ARPage() {
       }, 0);
       const worstStatus = related.reduce<Compliance>((acc, x) =>
         STATUS_RANK[x.status] > STATUS_RANK[acc] ? x.status : acc, "not_applicable");
-      return { ...adv, affectedAssets, totalAssets, worstStatus, envCount: related.length };
+      const cyn = codeYearNum(adv.code);
+      const publishedYear = adv.published_at ? new Date(adv.published_at).getUTCFullYear() : null;
+      const sortSource: "code" | "published_at" | "fallback" =
+        cyn.year > 0 ? "code" : (publishedYear ? "published_at" : "fallback");
+      const sortYear = sortSource === "code" ? cyn.year : (publishedYear ?? 0);
+      const divergent = !!(cyn.year && publishedYear && cyn.year !== publishedYear);
+      return {
+        ...adv, affectedAssets, totalAssets, worstStatus, envCount: related.length,
+        sortYear, sortNum: cyn.num, sortSource, publishedYear, divergent,
+      };
     });
   }, [advisories, assessments, environments, envFilter, yearWindow]);
 
@@ -275,11 +289,12 @@ export default function ARPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="cross" className="space-y-4">
-        <TabsList className="grid grid-cols-4 lg:w-[760px]">
+        <TabsList className="grid grid-cols-5 lg:w-[940px]">
           <TabsTrigger value="cross" className="gap-2"><BarChart3 className="h-3.5 w-3.5" /> Análise Cruzada</TabsTrigger>
           <TabsTrigger value="catalog" className="gap-2"><Database className="h-3.5 w-3.5" /> Catálogo CTIR</TabsTrigger>
           <TabsTrigger value="environments" className="gap-2"><Lock className="h-3.5 w-3.5" /> Ambientes</TabsTrigger>
           <TabsTrigger value="sync" className="gap-2"><Rss className="h-3.5 w-3.5" /> Sincronização</TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2"><FileWarning className="h-3.5 w-3.5" /> Auditoria</TabsTrigger>
         </TabsList>
 
         {/* Análise Cruzada */}
@@ -612,6 +627,86 @@ export default function ARPage() {
               tone="primary"
             />
           </div>
+        </TabsContent>
+
+        {/* Auditoria de ordenação */}
+        <TabsContent value="audit" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <FileWarning className="h-5 w-5 text-warning mt-0.5" />
+                <div>
+                  <CardTitle className="heading text-lg">Auditoria da chave de ordenação</CardTitle>
+                  <CardDescription className="space-y-1">
+                    <p>
+                      O CTIR Gov publica os itens de um ano sob a data da pasta (ex.: todos os ARs de 2026 retornam <code className="font-mono text-[11px]">dc:date=2025-01-17</code>).
+                      Por isso o painel <strong>não usa <code className="font-mono text-[11px]">published_at</code> como chave primária de ordenação</strong>.
+                    </p>
+                    <p>
+                      Regra aplicada: <strong>ano + número extraídos do <code className="font-mono text-[11px]">code</code></strong>
+                      (regex <code className="font-mono text-[11px]">/-(\d{"{4}"})-(\d+)/</code>, ex.: <code className="font-mono text-[11px]">CTIR-AL-2026-014 → ano=2026, num=14</code>),
+                      desempate por <code className="font-mono text-[11px]">published_at</code> DESC. Janela: ano corrente + 2 anteriores.
+                    </p>
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <KpiCard icon={Database} label="Total avaliado" value={views.length} hint="Após janela 3 anos" tone="primary" />
+                <KpiCard icon={CheckCircle2} label="Ordenado por code" value={views.filter(v => v.sortSource === "code").length} hint="Chave confiável" tone="accent" />
+                <KpiCard icon={Clock} label="Fallback published_at" value={views.filter(v => v.sortSource === "published_at").length} hint="Code sem padrão" tone="warning" />
+                <KpiCard icon={AlertTriangle} label="Divergência detectada" value={views.filter(v => v.divergent).length} hint="ano(code) ≠ ano(published_at)" tone="destructive" />
+              </div>
+
+              <div className="rounded-md border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Code</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Ano (code)</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Nº (code)</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">published_at</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Ano (published)</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Campo usado</TableHead>
+                      <TableHead className="font-mono text-[10px] uppercase tracking-wider">Divergência</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {views.map((v) => (
+                      <TableRow key={v.id} className={v.divergent ? "bg-warning/5" : ""}>
+                        <TableCell className="font-mono text-xs">{v.code}</TableCell>
+                        <TableCell className="font-mono text-xs">{v.sortYear || "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{v.sortNum || "—"}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{v.published_at?.slice(0, 10) ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{v.publishedYear ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`font-mono text-[10px] ${
+                            v.sortSource === "code" ? "bg-accent/15 text-accent border-accent/30"
+                            : v.sortSource === "published_at" ? "bg-warning/15 text-warning border-warning/30"
+                            : "bg-muted text-muted-foreground border-border"}`}>
+                            {v.sortSource}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {v.divergent ? (
+                            <Badge variant="outline" className="font-mono text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                              {v.publishedYear} → {v.sortYear}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {views.length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Nenhum advisory na janela atual.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
