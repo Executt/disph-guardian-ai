@@ -135,9 +135,31 @@ export default function ARPage() {
     }
   }
 
+  // Restrict to current year + 2 previous (CTIR window)
+  const yearWindow = useMemo(() => {
+    const cy = new Date().getUTCFullYear();
+    return new Set([cy, cy - 1, cy - 2]);
+  }, []);
+
+  function codeYearNum(code: string): { year: number; num: number } {
+    const m = code.match(/-(\d{4})-(\d+)/);
+    return { year: m ? Number(m[1]) : 0, num: m ? Number(m[2]) : 0 };
+  }
+
   // Compose enriched advisory views (with cross-env rollup)
   const views: AdvisoryView[] = useMemo(() => {
-    return advisories.map((adv) => {
+    const filteredByYear = advisories.filter((adv) => {
+      const { year } = codeYearNum(adv.code);
+      // Use code year (reliable) instead of published_at (CTIR retorna data da pasta)
+      return yearWindow.has(year);
+    });
+    const sorted = [...filteredByYear].sort((a, b) => {
+      const ay = codeYearNum(a.code), by = codeYearNum(b.code);
+      if (by.year !== ay.year) return by.year - ay.year;
+      if (by.num !== ay.num) return by.num - ay.num;
+      return (b.published_at ?? "").localeCompare(a.published_at ?? "");
+    });
+    return sorted.map((adv) => {
       const related = assessments.filter((x) => x.advisory_id === adv.id &&
         (envFilter === "all" || x.environment_id === envFilter));
       const affectedAssets = related.reduce((s, x) => s + (x.affected_assets ?? 0), 0);
