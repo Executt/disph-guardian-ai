@@ -174,7 +174,16 @@ export default function ARPage() {
       }, 0);
       const worstStatus = related.reduce<Compliance>((acc, x) =>
         STATUS_RANK[x.status] > STATUS_RANK[acc] ? x.status : acc, "not_applicable");
-      return { ...adv, affectedAssets, totalAssets, worstStatus, envCount: related.length };
+      const cyn = codeYearNum(adv.code);
+      const publishedYear = adv.published_at ? new Date(adv.published_at).getUTCFullYear() : null;
+      const sortSource: "code" | "published_at" | "fallback" =
+        cyn.year > 0 ? "code" : (publishedYear ? "published_at" : "fallback");
+      const sortYear = sortSource === "code" ? cyn.year : (publishedYear ?? 0);
+      const divergent = !!(cyn.year && publishedYear && cyn.year !== publishedYear);
+      return {
+        ...adv, affectedAssets, totalAssets, worstStatus, envCount: related.length,
+        sortYear, sortNum: cyn.num, sortSource, publishedYear, divergent,
+      };
     });
   }, [advisories, assessments, environments, envFilter, yearWindow]);
 
