@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
 
   // Parse options
   let force = false;
-  let yearsBack = 1;
+  let yearsBack = 2; // ano corrente + 2 anteriores
   try {
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({} as Record<string, unknown>));
