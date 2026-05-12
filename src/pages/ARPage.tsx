@@ -171,7 +171,7 @@ export default function ARPage() {
         STATUS_RANK[x.status] > STATUS_RANK[acc] ? x.status : acc, "not_applicable");
       return { ...adv, affectedAssets, totalAssets, worstStatus, envCount: related.length };
     });
-  }, [advisories, assessments, environments, envFilter]);
+  }, [advisories, assessments, environments, envFilter, yearWindow]);
 
   const filtered = useMemo(() => {
     return views.filter((a) => {
