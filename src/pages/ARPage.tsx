@@ -56,6 +56,11 @@ interface AdvisoryView extends Advisory {
   totalAssets: number;
   worstStatus: Compliance;
   envCount: number;
+  sortYear: number;
+  sortNum: number;
+  sortSource: "code" | "published_at" | "fallback";
+  publishedYear: number | null;
+  divergent: boolean;
 }
 
 const SEVERITY_STYLE: Record<Severity, { label: string; cls: string; icon: typeof ShieldAlert }> = {
