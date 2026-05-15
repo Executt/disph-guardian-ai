@@ -136,7 +136,7 @@ export default function AgentDetailPage() {
   }
 
   async function updateChannel(ch: AgentChannel, patch: Partial<AgentChannel>) {
-    const { error } = await supabase.from("agent_channels").update(patch).eq("id", ch.id!);
+    const { error } = await supabase.from("agent_channels").update(patch as any).eq("id", ch.id!);
     if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
     else load();
   }
