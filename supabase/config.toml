@@ -2,3 +2,6 @@ project_id = "hulbzdhqiuczvqbnoivv"
 
 [functions.sync-ctir-advisories]
 verify_jwt = false
+
+[functions.ar-audit]
+verify_jwt = true
