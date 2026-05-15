@@ -41,6 +41,22 @@ const App = () => (
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/ar" element={<ARPage />} />
               <Route
+                path="/agents"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "operator"]}>
+                    <AgentsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/:id"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "operator"]}>
+                    <AgentDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/settings"
                 element={
                   <ProtectedRoute requiredRoles={["admin"]}>
