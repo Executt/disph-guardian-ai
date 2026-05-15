@@ -74,6 +74,249 @@ export type Database = {
           },
         ]
       }
+      agent_channels: {
+        Row: {
+          agent_id: string
+          channel_type: Database["public"]["Enums"]["agent_channel_type"]
+          config: Json
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string | null
+          requires_approval: boolean
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          channel_type: Database["public"]["Enums"]["agent_channel_type"]
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string | null
+          requires_approval?: boolean
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          channel_type?: Database["public"]["Enums"]["agent_channel_type"]
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string | null
+          requires_approval?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_channels_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_executions: {
+        Row: {
+          agent_id: string
+          channel_type: Database["public"]["Enums"]["agent_channel_type"] | null
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          input: string | null
+          metadata: Json
+          output: string | null
+          status: Database["public"]["Enums"]["agent_execution_status"]
+          tokens_used: number | null
+          triggered_by: Database["public"]["Enums"]["agent_trigger_source"]
+          triggered_by_user: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          channel_type?:
+            | Database["public"]["Enums"]["agent_channel_type"]
+            | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input?: string | null
+          metadata?: Json
+          output?: string | null
+          status?: Database["public"]["Enums"]["agent_execution_status"]
+          tokens_used?: number | null
+          triggered_by?: Database["public"]["Enums"]["agent_trigger_source"]
+          triggered_by_user?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          channel_type?:
+            | Database["public"]["Enums"]["agent_channel_type"]
+            | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input?: string | null
+          metadata?: Json
+          output?: string | null
+          status?: Database["public"]["Enums"]["agent_execution_status"]
+          tokens_used?: number | null
+          triggered_by?: Database["public"]["Enums"]["agent_trigger_source"]
+          triggered_by_user?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_executions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_profiles: {
+        Row: {
+          agent_id: string
+          created_at: string
+          guardrails: Json
+          id: string
+          max_tokens: number
+          model: string
+          risk_threshold: number
+          role_focus: string
+          system_prompt: string
+          temperature: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          guardrails?: Json
+          id?: string
+          max_tokens?: number
+          model?: string
+          risk_threshold?: number
+          role_focus?: string
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          guardrails?: Json
+          id?: string
+          max_tokens?: number
+          model?: string
+          risk_threshold?: number
+          role_focus?: string
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_profiles_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_skills: {
+        Row: {
+          agent_id: string
+          category: string
+          created_at: string
+          enabled: boolean
+          id: string
+          parameters: Json
+          risk_level: number
+          skill_name: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          category: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          parameters?: Json
+          risk_level?: number
+          skill_name: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          category?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          parameters?: Json
+          risk_level?: number
+          skill_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_skills_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          area: string | null
+          autonomy_level: Database["public"]["Enums"]["agent_autonomy"]
+          avatar_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["agent_status"]
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          area?: string | null
+          autonomy_level?: Database["public"]["Enums"]["agent_autonomy"]
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["agent_status"]
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          area?: string | null
+          autonomy_level?: Database["public"]["Enums"]["agent_autonomy"]
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["agent_status"]
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           created_at: string
@@ -451,6 +694,22 @@ export type Database = {
     Enums: {
       advisory_kind: "alert" | "recommendation"
       advisory_severity: "critical" | "high" | "medium" | "low"
+      agent_autonomy: "manual" | "supervised" | "autonomous"
+      agent_channel_type: "teams" | "whatsapp" | "telegram"
+      agent_execution_status:
+        | "pending"
+        | "running"
+        | "awaiting_approval"
+        | "success"
+        | "failed"
+        | "cancelled"
+      agent_status: "draft" | "active" | "paused" | "archived"
+      agent_trigger_source:
+        | "manual"
+        | "auto"
+        | "channel"
+        | "schedule"
+        | "webhook"
       app_role: "admin" | "operator" | "viewer" | "auditor"
       cluster_provider:
         | "eks"
@@ -617,6 +876,24 @@ export const Constants = {
     Enums: {
       advisory_kind: ["alert", "recommendation"],
       advisory_severity: ["critical", "high", "medium", "low"],
+      agent_autonomy: ["manual", "supervised", "autonomous"],
+      agent_channel_type: ["teams", "whatsapp", "telegram"],
+      agent_execution_status: [
+        "pending",
+        "running",
+        "awaiting_approval",
+        "success",
+        "failed",
+        "cancelled",
+      ],
+      agent_status: ["draft", "active", "paused", "archived"],
+      agent_trigger_source: [
+        "manual",
+        "auto",
+        "channel",
+        "schedule",
+        "webhook",
+      ],
       app_role: ["admin", "operator", "viewer", "auditor"],
       cluster_provider: [
         "eks",
