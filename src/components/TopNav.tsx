@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, AlertTriangle, Server, Shield, ShieldCheck,
-  Settings, LogOut, User, ChevronDown, Menu, X, Brain, Users, ShieldAlert
+  Settings, LogOut, User, ChevronDown, Menu, X, Brain, Users, ShieldAlert, Bot
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
