@@ -58,6 +58,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/skills-catalog"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "operator"]}>
+                    <SkillsCatalogPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/settings"
                 element={
                   <ProtectedRoute requiredRoles={["admin"]}>
