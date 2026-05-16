@@ -17,6 +17,7 @@ import AdminPage from "@/pages/AdminPage";
 import ARPage from "@/pages/ARPage";
 import AgentsPage from "@/pages/AgentsPage";
 import AgentDetailPage from "@/pages/AgentDetailPage";
+import SkillsCatalogPage from "@/pages/SkillsCatalogPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={["admin", "operator"]}>
                     <AgentDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/skills-catalog"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "operator"]}>
+                    <SkillsCatalogPage />
                   </ProtectedRoute>
                 }
               />

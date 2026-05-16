@@ -650,6 +650,42 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_catalog_settings: {
+        Row: {
+          category: string
+          created_at: string
+          default_parameters: Json
+          enabled: boolean
+          id: string
+          notes: string | null
+          skill_name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          default_parameters?: Json
+          enabled?: boolean
+          id?: string
+          notes?: string | null
+          skill_name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          default_parameters?: Json
+          enabled?: boolean
+          id?: string
+          notes?: string | null
+          skill_name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
