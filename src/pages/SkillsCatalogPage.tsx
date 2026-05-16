@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, RefreshCw, AlertCircle } from "lucide-react";
+import { Loader2, Save, RefreshCw, AlertCircle, Search, X } from "lucide-react";
 
 interface CatalogSetting {
   skill_name: string;
@@ -55,7 +55,11 @@ export default function SkillsCatalogPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<LocalState>({});
-  const [activeCat, setActiveCat] = useState<SkillCategory>("ansible");
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState<SkillCategory | "all">("all");
+  const [riskFilter, setRiskFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
 
   const load = async () => {
     setLoading(true);
@@ -94,6 +98,29 @@ export default function SkillsCatalogPage() {
     const dirty = Object.values(state).filter((s) => s?.dirty).length;
     return { total, enabled, disabled: total - enabled, dirty };
   }, [state]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return SKILLS.filter((skill) => {
+      const s = state[skill.name];
+      if (catFilter !== "all" && skill.category !== catFilter) return false;
+      if (riskFilter !== "all" && String(skill.riskLevel) !== riskFilter) return false;
+      if (roleFilter !== "all" && skill.requiredRole !== roleFilter) return false;
+      if (statusFilter === "enabled" && !s?.enabled) return false;
+      if (statusFilter === "disabled" && s?.enabled) return false;
+      if (statusFilter === "dirty" && !s?.dirty) return false;
+      if (q) {
+        const hay = `${skill.name} ${skill.description} ${skill.category} ${s?.notes ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [search, catFilter, riskFilter, roleFilter, statusFilter, state]);
+
+  const clearFilters = () => {
+    setSearch(""); setCatFilter("all"); setRiskFilter("all"); setRoleFilter("all"); setStatusFilter("all");
+  };
+  const hasActiveFilter = search !== "" || catFilter !== "all" || riskFilter !== "all" || roleFilter !== "all" || statusFilter !== "all";
 
   const updateSkill = (name: string, patch: Partial<LocalState[string]>) => {
     setState((prev) => ({ ...prev, [name]: { ...prev[name], ...patch, dirty: true } }));
@@ -178,97 +205,163 @@ export default function SkillsCatalogPage() {
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Não salvas</div><div className="text-2xl font-bold text-warning">{summary.dirty}</div></CardContent></Card>
       </div>
 
-      <Tabs value={activeCat} onValueChange={(v) => setActiveCat(v as SkillCategory)}>
-        <TabsList className="flex flex-wrap h-auto">
-          {SKILL_CATEGORIES.map((c) => (
-            <TabsTrigger key={c.id} value={c.id} className="text-xs">
-              {c.label}
-              <Badge variant="outline" className="ml-2 text-[10px]">{grouped[c.id].length}</Badge>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[220px]">
+              <Label className="text-xs mb-1 block">Buscar</Label>
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Nome, descrição, categoria, notas..."
+                  className="pl-8"
+                />
+              </div>
+            </div>
+            <div className="w-44">
+              <Label className="text-xs mb-1 block">Categoria</Label>
+              <Select value={catFilter} onValueChange={(v) => setCatFilter(v as SkillCategory | "all")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas ({SKILLS.length})</SelectItem>
+                  {SKILL_CATEGORIES.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.label} ({grouped[c.id].length})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-36">
+              <Label className="text-xs mb-1 block">Risco</Label>
+              <Select value={riskFilter} onValueChange={setRiskFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {[1,2,3,4,5].map((r) => <SelectItem key={r} value={String(r)}>Nível {r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-36">
+              <Label className="text-xs mb-1 block">Role mínima</Label>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="viewer">viewer</SelectItem>
+                  <SelectItem value="operator">operator</SelectItem>
+                  <SelectItem value="admin">admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-40">
+              <Label className="text-xs mb-1 block">Status</Label>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="enabled">Habilitadas</SelectItem>
+                  <SelectItem value="disabled">Desabilitadas</SelectItem>
+                  <SelectItem value="dirty">Não salvas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {hasActiveFilter && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+                <X className="h-3.5 w-3.5" /> Limpar
+              </Button>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Mostrando <span className="text-foreground font-medium">{filtered.length}</span> de {SKILLS.length} skills
+          </div>
+        </CardContent>
+      </Card>
 
-        {SKILL_CATEGORIES.map((cat) => (
-          <TabsContent key={cat.id} value={cat.id} className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">{cat.description}</p>
-            {grouped[cat.id].map((skill) => {
-              const s = state[skill.name];
-              if (!s) return null;
-              return (
-                <Card key={skill.name} className={s.enabled ? "" : "opacity-60"}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="space-y-1">
-                        <CardTitle className="text-base font-mono flex items-center gap-2">
-                          {skill.name}
-                          <Badge variant="outline" className={`text-[10px] font-mono ${RISK_COLORS[skill.riskLevel]}`}>
-                            risco {skill.riskLevel}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px] font-mono uppercase">
-                            {skill.requiredRole}
-                          </Badge>
-                          {s.dirty && (
-                            <Badge variant="outline" className="text-[10px] gap-1 text-warning border-warning/40">
-                              <AlertCircle className="h-3 w-3" /> não salvo
-                            </Badge>
-                          )}
-                        </CardTitle>
-                        <CardDescription>{skill.description}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`en-${skill.name}`} className="text-xs">Ativa</Label>
-                        <Switch
-                          id={`en-${skill.name}`}
-                          checked={s.enabled}
-                          onCheckedChange={(v) => updateSkill(skill.name, { enabled: v })}
+      <div className="space-y-4">
+        {filtered.length === 0 ? (
+          <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">
+            Nenhuma skill corresponde aos filtros aplicados.
+          </CardContent></Card>
+        ) : filtered.map((skill) => {
+          const s = state[skill.name];
+          if (!s) return null;
+          return (
+            <Card key={skill.name} className={s.enabled ? "" : "opacity-60"}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="space-y-1">
+                    <CardTitle className="text-base font-mono flex items-center gap-2 flex-wrap">
+                      {skill.name}
+                      <Badge variant="outline" className="text-[10px] font-mono uppercase">
+                        {skill.category}
+                      </Badge>
+                      <Badge variant="outline" className={`text-[10px] font-mono ${RISK_COLORS[skill.riskLevel]}`}>
+                        risco {skill.riskLevel}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] font-mono uppercase">
+                        {skill.requiredRole}
+                      </Badge>
+                      {s.dirty && (
+                        <Badge variant="outline" className="text-[10px] gap-1 text-warning border-warning/40">
+                          <AlertCircle className="h-3 w-3" /> não salvo
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>{skill.description}</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`en-${skill.name}`} className="text-xs">Ativa</Label>
+                    <Switch
+                      id={`en-${skill.name}`}
+                      checked={s.enabled}
+                      onCheckedChange={(v) => updateSkill(skill.name, { enabled: v })}
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Object.keys(skill.parameters).length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Object.entries(skill.parameters).map(([key, def]) => (
+                      <div key={key} className="space-y-1">
+                        <Label className="text-xs font-mono">
+                          {key} <span className="text-muted-foreground">({def.type})</span>
+                        </Label>
+                        <Input
+                          value={s.default_parameters[key] ?? ""}
+                          placeholder={def.default != null ? `padrão: ${def.default}` : def.description}
+                          onChange={(e) => updateSkill(skill.name, {
+                            default_parameters: { ...s.default_parameters, [key]: e.target.value },
+                          })}
                         />
+                        <p className="text-[10px] text-muted-foreground">{def.description}</p>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {Object.keys(skill.parameters).length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {Object.entries(skill.parameters).map(([key, def]) => (
-                          <div key={key} className="space-y-1">
-                            <Label className="text-xs font-mono">
-                              {key} <span className="text-muted-foreground">({def.type})</span>
-                            </Label>
-                            <Input
-                              value={s.default_parameters[key] ?? ""}
-                              placeholder={def.default != null ? `padrão: ${def.default}` : def.description}
-                              onChange={(e) => updateSkill(skill.name, {
-                                default_parameters: { ...s.default_parameters, [key]: e.target.value },
-                              })}
-                            />
-                            <p className="text-[10px] text-muted-foreground">{def.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">Sem parâmetros configuráveis.</p>
-                    )}
-                    <div className="space-y-1">
-                      <Label className="text-xs">Notas / restrições</Label>
-                      <Textarea
-                        rows={2}
-                        value={s.notes}
-                        placeholder="Ex.: limitar a ambientes de homolog; requer aprovação dupla..."
-                        onChange={(e) => updateSkill(skill.name, { notes: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      <Button size="sm" onClick={() => saveSkill(skill)} disabled={!s.dirty || s.saving} className="gap-2">
-                        {s.saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                        Salvar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </TabsContent>
-        ))}
-      </Tabs>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Sem parâmetros configuráveis.</p>
+                )}
+                <div className="space-y-1">
+                  <Label className="text-xs">Notas / restrições</Label>
+                  <Textarea
+                    rows={2}
+                    value={s.notes}
+                    placeholder="Ex.: limitar a ambientes de homolog; requer aprovação dupla..."
+                    onChange={(e) => updateSkill(skill.name, { notes: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={() => saveSkill(skill)} disabled={!s.dirty || s.saving} className="gap-2">
+                    {s.saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                    Salvar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
