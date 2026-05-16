@@ -127,7 +127,7 @@ export default function SkillsCatalogPage() {
     };
     const { error } = await supabase
       .from("skill_catalog_settings")
-      .upsert([payload], { onConflict: "skill_name" });
+      .upsert([payload as any], { onConflict: "skill_name" });
     setState((prev) => ({
       ...prev,
       [skill.name]: { ...prev[skill.name], saving: false, dirty: !!error },
