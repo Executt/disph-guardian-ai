@@ -99,6 +99,29 @@ export default function SkillsCatalogPage() {
     return { total, enabled, disabled: total - enabled, dirty };
   }, [state]);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return SKILLS.filter((skill) => {
+      const s = state[skill.name];
+      if (catFilter !== "all" && skill.category !== catFilter) return false;
+      if (riskFilter !== "all" && String(skill.riskLevel) !== riskFilter) return false;
+      if (roleFilter !== "all" && skill.requiredRole !== roleFilter) return false;
+      if (statusFilter === "enabled" && !s?.enabled) return false;
+      if (statusFilter === "disabled" && s?.enabled) return false;
+      if (statusFilter === "dirty" && !s?.dirty) return false;
+      if (q) {
+        const hay = `${skill.name} ${skill.description} ${skill.category} ${s?.notes ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [search, catFilter, riskFilter, roleFilter, statusFilter, state]);
+
+  const clearFilters = () => {
+    setSearch(""); setCatFilter("all"); setRiskFilter("all"); setRoleFilter("all"); setStatusFilter("all");
+  };
+  const hasActiveFilter = search !== "" || catFilter !== "all" || riskFilter !== "all" || roleFilter !== "all" || statusFilter !== "all";
+
   const updateSkill = (name: string, patch: Partial<LocalState[string]>) => {
     setState((prev) => ({ ...prev, [name]: { ...prev[name], ...patch, dirty: true } }));
   };
