@@ -55,7 +55,11 @@ export default function SkillsCatalogPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<LocalState>({});
-  const [activeCat, setActiveCat] = useState<SkillCategory>("ansible");
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState<SkillCategory | "all">("all");
+  const [riskFilter, setRiskFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled" | "dirty">("all");
 
   const load = async () => {
     setLoading(true);
