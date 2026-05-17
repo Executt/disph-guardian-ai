@@ -24,6 +24,16 @@ export default function AppLayout() {
           </div>
         </main>
 
+        {/* Backdrop */}
+        {chatOpen && (
+          <button
+            type="button"
+            aria-label="Fechar assistente"
+            onClick={() => setChatOpen(false)}
+            className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200"
+          />
+        )}
+
         {/* Slide-over assistant panel */}
         <aside
           className={cn(
