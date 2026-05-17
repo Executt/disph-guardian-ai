@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Send, User, Sparkles, X, Maximize2, Minimize2, Loader2 } from "lucide-react";
+import { Bot, Send, User, Sparkles, X, Eraser, Loader2, PanelRightClose } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -128,11 +128,10 @@ async function streamChat({
 }
 
 interface AIChatConsoleProps {
-  expanded?: boolean;
-  onToggleExpand?: () => void;
+  onClose?: () => void;
 }
 
-export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsoleProps) {
+export function AIChatConsole({ onClose }: AIChatConsoleProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -234,7 +233,7 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
   const currentModel = AI_MODELS.find(m => m.value === selectedModel);
 
   return (
-    <Card className={`border-border/60 bg-card/80 backdrop-blur flex flex-col ${expanded ? "h-[80vh]" : "h-[500px]"}`}>
+    <Card className="border-border/60 bg-card/80 backdrop-blur flex flex-col h-full rounded-none border-0 border-l">
       <CardHeader className="pb-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -266,14 +265,14 @@ export function AIChatConsole({ expanded = false, onToggleExpand }: AIChatConsol
                 ))}
               </SelectContent>
             </Select>
-            {onToggleExpand && (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggleExpand}>
-                {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearChat} title="Limpar chat">
+              <Eraser className="h-3.5 w-3.5" />
+            </Button>
+            {onClose && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Ocultar assistente">
+                <PanelRightClose className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearChat}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
           </div>
         </div>
       </CardHeader>
