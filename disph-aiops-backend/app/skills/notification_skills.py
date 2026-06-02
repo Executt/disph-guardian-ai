@@ -226,3 +226,91 @@ async def notify_multi_channel(params: dict) -> dict:
         service=params.get("service"),
     )
     return {"action": "multi_channel_dispatch", **result}
+
+
+# ─────────────────────────────────────────────────────────────
+# Skills de colaboração (Slack, Discord, Mattermost, Telegram)
+# Skeletons – integração real via webhooks/bots configurados em settings.
+# ─────────────────────────────────────────────────────────────
+
+@register_skill(
+    name="notify_slack",
+    description="Envia mensagem para canal Slack via Incoming Webhook ou chat.postMessage",
+    risk_level=1,
+    required_role="operator",
+    parameters_schema={
+        "channel": {"type": "string", "required": True, "description": "#canal ou ID"},
+        "message": {"type": "string", "required": True},
+        "severity": {"type": "string", "default": "info", "enum": ["critical", "high", "warning", "info", "success"]},
+        "blocks": {"type": "array", "required": False, "description": "Block Kit blocks (opcional)"},
+        "webhook_url": {"type": "string", "required": False},
+    },
+)
+async def notify_slack(params: dict) -> dict:
+    return {
+        "action": "slack_notification_sent",
+        "status": "skipped",
+        "reason": "slack_client_not_configured",
+        "channel": params["channel"],
+        "severity": params.get("severity", "info"),
+    }
+
+
+@register_skill(
+    name="notify_discord",
+    description="Envia mensagem para canal Discord via Webhook (com embeds opcionais)",
+    risk_level=1,
+    required_role="operator",
+    parameters_schema={
+        "webhook_url": {"type": "string", "required": True},
+        "message": {"type": "string", "required": True},
+        "username": {"type": "string", "required": False, "default": "DISPH"},
+        "embeds": {"type": "array", "required": False},
+    },
+)
+async def notify_discord(params: dict) -> dict:
+    return {
+        "action": "discord_notification_sent",
+        "status": "skipped",
+        "reason": "discord_client_not_configured",
+    }
+
+
+@register_skill(
+    name="notify_mattermost",
+    description="Envia mensagem para canal Mattermost via Incoming Webhook",
+    risk_level=1,
+    required_role="operator",
+    parameters_schema={
+        "channel": {"type": "string", "required": True},
+        "message": {"type": "string", "required": True},
+        "webhook_url": {"type": "string", "required": False},
+    },
+)
+async def notify_mattermost(params: dict) -> dict:
+    return {
+        "action": "mattermost_notification_sent",
+        "status": "skipped",
+        "reason": "mattermost_client_not_configured",
+        "channel": params["channel"],
+    }
+
+
+@register_skill(
+    name="notify_telegram",
+    description="Envia mensagem para chat/grupo Telegram via Bot API",
+    risk_level=1,
+    required_role="operator",
+    parameters_schema={
+        "chat_id": {"type": "string", "required": True},
+        "message": {"type": "string", "required": True},
+        "parse_mode": {"type": "string", "default": "Markdown", "enum": ["Markdown", "HTML"]},
+    },
+)
+async def notify_telegram(params: dict) -> dict:
+    return {
+        "action": "telegram_notification_sent",
+        "status": "skipped",
+        "reason": "telegram_bot_not_configured",
+        "chat_id": params["chat_id"],
+    }
