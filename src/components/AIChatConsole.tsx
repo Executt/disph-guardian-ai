@@ -135,7 +135,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("google/gemini-3-flash-preview");
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_AI_MODEL);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
