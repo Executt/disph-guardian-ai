@@ -196,7 +196,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label className="text-xs font-mono uppercase tracking-wider">Modelo Padrão do Chat</Label>
-              <Select defaultValue="google/gemini-3-flash-preview">
+              <Select defaultValue="google/gemini-2.5-flash">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {AI_MODELS.map(m => (
