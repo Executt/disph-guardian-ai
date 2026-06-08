@@ -207,3 +207,17 @@ Hospedado em `disph-aiops-backend/`. Endpoints internos (não expostos diretamen
 | `POST /api/rag/query`              | Consulta knowledge base com embeddings   |
 
 Comunicação **frontend → sidecar** sempre passa por uma Edge Function como proxy autenticado.
+
+---
+
+## Atualização — Auditoria Jun/2026
+
+**Edge Functions ativas:**
+- `ai-chat` — proxy streaming SSE para Lovable AI Gateway (consumido por `AIChatConsole`).
+- `sync-ctir-advisories` — pull dos boletins CTIR Gov.br (consumido por `ARPage`).
+
+**Modelos de IA disponíveis** (fonte única em `src/lib/aiModels.ts`):
+- Google: `gemini-3-flash-preview`, `gemini-2.5-flash` (padrão), `gemini-2.5-flash-lite`, `gemini-2.5-pro`, `gemini-3.1-pro-preview`.
+- OpenAI: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.2`.
+
+**Sidecar Python (`disph-aiops-backend`)** expõe `/skills` (registry), `/execute` (run skill), `/health`. Os nomes das skills agora coincidem com o catálogo frontend (`trigger_ansible_playbook`, `k8s_scale_deployment`, `create_gitlab_mr`, etc.).

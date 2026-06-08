@@ -256,3 +256,27 @@ Consumido em `src/hooks/useRealtimeData.ts`.
 - **`audit_logs`:** retenção mínima **5 anos** (exigência SISP/LGPD).
 - **`ai_conversations`:** retenção 90 dias (configurável).
 - **`incidents` resolvidos:** arquivamento após 1 ano.
+
+---
+
+## Atualização — Auditoria Jun/2026 (tabelas adicionais)
+
+Além das 6 tabelas já documentadas, o schema possui mais **10 tabelas** em produção:
+
+### Agentes IA (5)
+- **`agents`** — definição de cada agente (nome, descrição, status, modelo padrão, owner).
+- **`agent_profiles`** — perfis de comportamento/role focus (incidents, devsecops, itsm, ...).
+- **`agent_skills`** — vínculo N:N entre agentes e skills do catálogo (habilitação por agente).
+- **`agent_channels`** — canais de entrada/saída do agente (Teams, Slack, webhook, chat interno).
+- **`agent_executions`** — log de execuções (skill chamada, parâmetros, resultado, latência, custo).
+
+### CTIR Gov.br (3)
+- **`ctir_advisories`** — boletins de segurança sincronizados do CTIR.
+- **`ctir_sync_state`** — controle de sincronização (last_run, cursor, status).
+- **`advisory_environment_assessments`** — avaliação de aplicabilidade de cada AR aos ambientes monitorados.
+
+### Inventário e Catálogo (2)
+- **`monitored_environments`** — ambientes (prod/hml/dev) monitorados pelo DISPH.
+- **`skill_catalog_settings`** — flags por skill (habilitada, exige aprovação, riskLevel override).
+
+**RLS:** todas as 10 tabelas possuem 4 políticas (CRUD por role) exceto `ctir_sync_state` e `audit_logs` (2 — SELECT admin/auditor, INSERT service_role).

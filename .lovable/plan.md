@@ -1,27 +1,28 @@
-## Análise — principais achados
+# DISPH Guardian AI — Roadmap (pós-auditoria Jun/2026)
 
-- **AI_MODELS triplicado** (`AIChatConsole.tsx`, `agentSkills.ts`, hardcode em `AdminPage.tsx`) com chaves e listas divergentes.
-- **`AppSidebar.tsx`** é dead code; **dois `<Toaster>`** montados em `App.tsx`.
-- **Skills FE↔BE com nomes divergentes** (`run_playbook` vs `trigger_ansible_playbook`, `scale_deployment` vs `k8s_scale_deployment`, etc.).
-- **Bug funcional**: rota `/audit` exclui role `auditor` (só admin).
-- **Docs desatualizados**: 10 tabelas não documentadas em `03-database-schema.md`; rotas `/ar`, `/agents`, `/agents/:id`, `/skills-catalog` ausentes em `02` e `08`; SEI mencionado mas não implementado.
+## Concluído nesta auditoria
+- [x] Fix bug: `/audit` aceita role `auditor`.
+- [x] Removido `src/components/AppSidebar.tsx` (dead code).
+- [x] Removido `Toaster` duplicado em `App.tsx` (mantido Sonner).
+- [x] Criado `src/lib/aiModels.ts` como fonte única de modelos.
+- [x] `AIChatConsole`, `SettingsPage`, `AdminPage`, `AgentsPage`, `AgentDetailPage` importam de `aiModels`.
+- [x] `agentSkills.ts` renomeado para padrão backend; adicionadas 7 skills BE-only.
+- [x] `console.error` → `toast.error` em `AIChatConsole`.
+- [x] Docs 02, 03, 04, 08, 09, 11 atualizados.
 
-## Plano (ordem de execução, baixo risco → maior impacto)
+## Top 8 Evoluções (backlog priorizado)
 
-1. **Fix bug**: `App.tsx` → `/audit` aceita `["admin","auditor"]`.
-2. **Deletar dead code**: `src/components/AppSidebar.tsx`.
-3. **Remover Toaster duplicado**: manter apenas Sonner em `App.tsx`.
-4. **Fonte única de modelos**: criar `src/lib/aiModels.ts` (type `AIModel { id, label, description, tier }`); re-exportar em `agentSkills.ts` para compat; `AIChatConsole.tsx`, `SettingsPage.tsx`, `AdminPage.tsx`, `AgentsPage.tsx`, `AgentDetailPage.tsx` passam a importar daí.
-5. **Padronizar nomes de skills** no `agentSkills.ts` para o padrão do backend (`trigger_ansible_playbook`, `k8s_scale_deployment`, `k8s_rollout_restart`, `create_gitlab_mr`, `trigger_gitlab_pipeline`) e adicionar as skills BE-only faltantes (`ansible_restart_service`, `k8s_cordon_node`, `query_zabbix`, `notify_teams_deploy`, `notify_teams_guardrail`, `notify_multi_channel`).
-6. **`console.error` → `toast.error`** em `AIChatConsole.tsx`.
-7. **Atualizar docs**: `02-arquitetura.md` (rotas + roles + SEI como roadmap), `03-database-schema.md` (10 tabelas faltantes), `04-api-routes.md` (modelos + edge functions), `08-inventario-funcoes.md` (12 páginas + remoção `AppSidebar`), `09-regras-de-negocio.md` (SEI roadmap, skills ITSM alinhadas), `11-administracao.md` (SEI roadmap, lista de modelos).
-8. **Roadmap em `.lovable/plan.md`**: Top 8 evoluções como backlog priorizado.
+| # | Item | Esforço | Impacto |
+|---|---|---|---|
+| 1 | **Confirm dialog** para skills com `riskLevel ≥ 4` antes da execução | S | Alto (segurança) |
+| 2 | **TypeScript types** do sidecar Python (gerar `.d.ts` a partir do `/skills` endpoint) | M | Médio |
+| 3 | **UI para `advisory_environment_assessments`** — exibir aplicabilidade de cada AR | M | Alto (CTIR) |
+| 4 | **Implementar SEI** (skills `open_sei_processo`, `assina_sei`) — atualmente roadmap | L | Médio (gov) |
+| 5 | **Implementar Freshservice e Azure DevOps** de verdade (skeletons existem) | M | Médio |
+| 6 | **Audit log do agente** — visualização gráfica das `agent_executions` (timeline, custo) | M | Alto (governança) |
+| 7 | **Cost tracker** por modelo LLM (campos em `ai_conversations` + dashboard) | M | Médio |
+| 8 | **Sincronização automática** do registry backend ↔ `agentSkills.ts` (script CI) | S | Médio (manutenção) |
 
-## Fora de escopo (registrado como roadmap)
-
-- Renomear chaves do backend Python para camelCase TS (mantemos mapeamento por nome).
-- Implementar SEI / Freshservice / Azure DevOps de verdade (skeletons já existem).
-- Confirmar/dialog UX para skills riskLevel ≥4 (separado, requer design).
-- Expor `advisory_environment_assessments` na UI.
-
-Pronto para executar?
+## Fora de escopo / decisões registradas
+- Snake_case do backend Python mantido; mapeamento por nome no frontend.
+- Skills BE seguem padrão `{categoria}_{ação}`; FE alinhado.
