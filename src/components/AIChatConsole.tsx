@@ -199,8 +199,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
         },
       });
     } catch (e) {
-      console.error(e);
-      toast.error("Falha na comunicação com a IA");
+      toast.error(e instanceof Error ? e.message : "Falha na comunicação com a IA");
       setIsTyping(false);
     }
   };
@@ -223,7 +222,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
     ]);
   };
 
-  const currentModel = AI_MODELS.find(m => m.value === selectedModel);
+  const currentModel = AI_MODELS.find(m => m.id === selectedModel);
 
   return (
     <Card className="border-border/60 bg-card/80 backdrop-blur flex flex-col h-full rounded-none border-0 border-l">
@@ -247,7 +246,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
               </SelectTrigger>
               <SelectContent>
                 {AI_MODELS.map((m) => (
-                  <SelectItem key={m.value} value={m.value} className="text-xs">
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
                     <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[8px] px-1 py-0">
                         {m.tier}
