@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import type { AppRole } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { AI_MODELS, DEFAULT_AI_MODEL } from "@/lib/aiModels";
 
 // ============= TYPES =============
 interface LdapConfig {
@@ -539,11 +540,14 @@ export default function AdminPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-mono uppercase tracking-wider">Modelo padrão do chat</Label>
-                  <Select defaultValue="google/gemini-3-flash-preview"><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent>
-                    <SelectItem value="google/gemini-3-flash-preview">Gemini 3 Flash (recomendado)</SelectItem>
-                    <SelectItem value="google/gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
-                    <SelectItem value="openai/gpt-5-mini">GPT-5 Mini</SelectItem>
-                  </SelectContent></Select>
+                  <Select defaultValue={DEFAULT_AI_MODEL}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {AI_MODELS.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid md:grid-cols-2 gap-3">
                   <Field label="Temperature (0-1)" placeholder="0.7" />

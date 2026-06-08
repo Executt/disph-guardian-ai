@@ -276,3 +276,16 @@ DISPH-AIOPS deve manter **99.5% de disponibilidade mensal** medida via:
 ### RN-CMP-03 — Janela de manutenção
 
 Domingos 02h–06h (BRT). Notificar 7 dias antes via banner + email para todos `admin`/`operator`.
+
+---
+
+## Atualização — Auditoria Jun/2026
+
+**RN-ITS-02 (SEI):** marcada como **NÃO IMPLEMENTADA** (roadmap). Nenhum código de integração com SEI existe atualmente.
+
+**Catálogo ITSM real** (RN-ITS-01): suporte ativo a 6 provedores via skill genérica `create_ticket(provider, ...)`:
+- GLPI, Jira (Cloud/DC), ServiceNow, CITSmart, Freshservice, Azure DevOps Boards.
+
+**Skills de alto risco (RN-SKL-01):** níveis 4-5 (`trigger_ansible_playbook`, `k8s_rollout_restart`, `k8s_cordon_node`, `k8s_rollback_deployment`, `create_change`) exigem role `operator`+ e devem ter confirmação UX (a implementar — ver `.lovable/plan.md`).
+
+**Auditor (RN-AUD-01):** role `auditor` agora tem acesso correto a `/audit` (bug corrigido).

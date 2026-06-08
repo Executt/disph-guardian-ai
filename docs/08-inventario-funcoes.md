@@ -134,3 +134,19 @@
 | Provedores de cluster suportados         | 9           |
 | Provedores ITSM suportados               | 6 (+ SEI)   |
 | Modelos LLM disponíveis                  | 9           |
+
+---
+
+## Atualização — Auditoria Jun/2026
+
+**Páginas (12, não 7):** Index, LoginPage, IncidentsPage, ARPage, AgentsPage, AgentDetailPage, SkillsCatalogPage, DevSecOpsPage, InfrastructurePage, AuditPage, AdminPage, SettingsPage, NotFound.
+
+**Hooks ativos:** `useAuth`, `useRealtimeData`, `use-toast`, `use-mobile`.
+
+**Componentes removidos/consolidados:**
+- `AppSidebar.tsx` — **deletado** (dead code, nunca importado).
+- `Toaster` shadcn — removido de `App.tsx` (mantido apenas Sonner).
+
+**Libs centrais:**
+- `src/lib/aiModels.ts` — fonte única de modelos LLM.
+- `src/lib/agentSkills.ts` — catálogo de skills (espelha registry do backend).

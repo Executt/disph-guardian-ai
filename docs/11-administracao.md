@@ -324,3 +324,17 @@ Padrão em todas as seções:
 - [ ] Backup/restore de configurações em arquivo JSON
 - [ ] UI de templates de email (WYSIWYG)
 - [ ] Histórico visual de mudanças com rollback 1-clique
+
+---
+
+## Atualização — Auditoria Jun/2026
+
+**SEI:** integração removida da lista ativa. Roadmap futuro — sem ETA.
+
+**Modelos de IA gerenciáveis** (Admin → IA / Modelos LLM):
+- Lista completa vem de `src/lib/aiModels.ts` (fonte única, sem hardcode).
+- Padrão atual: `google/gemini-2.5-flash` (estável). Preview: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gpt-5.2`.
+
+**Provedores ITSM ativos:** GLPI, Jira, ServiceNow, CITSmart, Freshservice, Azure DevOps.
+
+**Canais de notificação ativos:** Teams (com cards especializados deploy/guardrail), Slack, Discord, Mattermost, Telegram, WhatsApp Business, e fan-out `notify_multi_channel`.

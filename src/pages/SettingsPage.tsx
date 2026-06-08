@@ -196,11 +196,11 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label className="text-xs font-mono uppercase tracking-wider">Modelo Padrão do Chat</Label>
-              <Select defaultValue="google/gemini-3-flash-preview">
+              <Select defaultValue="google/gemini-2.5-flash">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {AI_MODELS.map(m => (
-                    <SelectItem key={m.value} value={m.value}>
+                    <SelectItem key={m.id} value={m.id}>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[8px] px-1 py-0">{m.tier}</Badge>
                         {m.label}
@@ -216,12 +216,12 @@ export default function SettingsPage() {
               <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Modelos Cadastrados</p>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {AI_MODELS.map(m => (
-                  <div key={m.value} className="flex items-center justify-between p-2 rounded-md bg-secondary/30 border border-border/40">
+                  <div key={m.id} className="flex items-center justify-between p-2 rounded-md bg-secondary/30 border border-border/40">
                     <div className="flex items-center gap-2">
                       <Zap className={`h-3.5 w-3.5 ${m.tier === "premium" ? "text-warning" : m.tier === "standard" ? "text-accent" : "text-primary"}`} />
                       <div>
                         <p className="text-xs font-medium">{m.label}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{m.value}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{m.id}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">

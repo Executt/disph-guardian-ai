@@ -262,3 +262,22 @@ Configuráveis via **Admin → Integrações**:
 - **Edge Functions stateless** — toda persistência via Postgres.
 - **Realtime by default** para incidentes (Postgres Changes).
 - **Internacionalização:** UI em pt-BR; pronto para i18n futuro.
+
+---
+
+## Atualização — Auditoria Jun/2026
+
+**Rotas reais (12 páginas):** `/`, `/login`, `/incidents`, `/ar`, `/agents`, `/agents/:id`, `/skills-catalog`, `/devsecops`, `/infrastructure`, `/audit`, `/admin`, `/settings`.
+
+**Roles por rota (corrigido):**
+- `/audit` — `admin, auditor` (anteriormente só admin, era bug).
+- `/agents`, `/agents/:id`, `/skills-catalog`, `/devsecops`, `/infrastructure` — `admin, operator`.
+- `/admin`, `/settings` — `admin`.
+
+**Componentes:**
+- Navegação top-bar via `TopNav`. `AppSidebar` foi **removido** (era dead code).
+- Toaster único (`sonner`); o `Toaster` shadcn duplicado foi removido de `App.tsx`.
+
+**SEI (Sistema Eletrônico de Informações):** marcado como **roadmap / não implementado**. Removido das integrações ativas. Atual stack ITSM: GLPI, Jira, ServiceNow, CITSmart, Freshservice, Azure DevOps.
+
+**Modelos de IA:** centralizados em `src/lib/aiModels.ts` (fonte única). `AIChatConsole`, `SettingsPage`, `AdminPage`, `AgentsPage`, `AgentDetailPage` consomem desta lib.

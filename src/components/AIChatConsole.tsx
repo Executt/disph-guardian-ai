@@ -8,6 +8,9 @@ import { Bot, Send, User, Sparkles, X, Eraser, Loader2, PanelRightClose } from "
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AI_MODELS, DEFAULT_AI_MODEL } from "@/lib/aiModels";
+
+export { AI_MODELS } from "@/lib/aiModels";
 
 interface Message {
   id: string;
@@ -24,17 +27,7 @@ const SUGGESTED_QUERIES = [
   "Resumo operacional do dia",
 ];
 
-export const AI_MODELS = [
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", description: "Rápido e eficiente", tier: "fast" },
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Equilibrado", tier: "fast" },
-  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", description: "Mais rápido e econômico", tier: "fast" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Melhor raciocínio complexo", tier: "premium" },
-  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", description: "Última geração Google", tier: "premium" },
-  { value: "openai/gpt-5", label: "GPT-5", description: "Poderoso, multimodal", tier: "premium" },
-  { value: "openai/gpt-5-mini", label: "GPT-5 Mini", description: "Custo-benefício", tier: "standard" },
-  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", description: "Velocidade máxima", tier: "fast" },
-  { value: "openai/gpt-5.2", label: "GPT-5.2", description: "Raciocínio avançado", tier: "premium" },
-] as const;
+// AI_MODELS importado da fonte única em @/lib/aiModels (re-exportado acima para retro-compat).
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -142,7 +135,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("google/gemini-3-flash-preview");
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_AI_MODEL);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -206,8 +199,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
         },
       });
     } catch (e) {
-      console.error(e);
-      toast.error("Falha na comunicação com a IA");
+      toast.error(e instanceof Error ? e.message : "Falha na comunicação com a IA");
       setIsTyping(false);
     }
   };
@@ -230,7 +222,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
     ]);
   };
 
-  const currentModel = AI_MODELS.find(m => m.value === selectedModel);
+  const currentModel = AI_MODELS.find(m => m.id === selectedModel);
 
   return (
     <Card className="border-border/60 bg-card/80 backdrop-blur flex flex-col h-full rounded-none border-0 border-l">
@@ -254,7 +246,7 @@ export function AIChatConsole({ onClose }: AIChatConsoleProps) {
               </SelectTrigger>
               <SelectContent>
                 {AI_MODELS.map((m) => (
-                  <SelectItem key={m.value} value={m.value} className="text-xs">
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
                     <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[8px] px-1 py-0">
                         {m.tier}
