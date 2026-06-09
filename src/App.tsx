@@ -17,6 +17,7 @@ import ARPage from "@/pages/ARPage";
 import AgentsPage from "@/pages/AgentsPage";
 import AgentDetailPage from "@/pages/AgentDetailPage";
 import SkillsCatalogPage from "@/pages/SkillsCatalogPage";
+import SystemAuditPage from "@/pages/SystemAuditPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
