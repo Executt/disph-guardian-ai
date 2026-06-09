@@ -97,6 +97,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/system-audit"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "auditor"]}>
+                    <SystemAuditPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin"
                 element={
                   <ProtectedRoute requiredRoles={["admin"]}>
