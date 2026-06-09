@@ -22,6 +22,7 @@ const navItems = [
   { label: "Infraestrutura", path: "/infrastructure", icon: Server },
   { label: "DevSecOps", path: "/devsecops", icon: Shield },
   { label: "Auditoria", path: "/audit", icon: ShieldCheck },
+  { label: "Auditoria Sistema", path: "/system-audit", icon: ClipboardCheck },
   { label: "Admin", path: "/admin", icon: Users },
   { label: "Configurações", path: "/settings", icon: Settings },
 ];
