@@ -18,6 +18,7 @@ import AgentsPage from "@/pages/AgentsPage";
 import AgentDetailPage from "@/pages/AgentDetailPage";
 import SkillsCatalogPage from "@/pages/SkillsCatalogPage";
 import SystemAuditPage from "@/pages/SystemAuditPage";
+import HypervisorsPage from "@/pages/HypervisorsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -85,6 +86,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={["admin", "operator"]}>
                     <InfrastructurePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hypervisors"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "operator", "viewer"]}>
+                    <HypervisorsPage />
                   </ProtectedRoute>
                 }
               />

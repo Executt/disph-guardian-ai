@@ -256,6 +256,24 @@ toast.error("Falha ao consultar o assistente DISPH", { description: err.message 
     ],
     remediation: "Adicionar aba 'Avaliações por Ambiente' em ARPage (registrado no roadmap).",
   },
+  {
+    id: "DISPH-AUD-011",
+    title: "Hypervisores (VMware/Hyper-V) sem coletor real — somente mock",
+    description:
+      "Nova página /hypervisors exibe hosts, VMs em risco e pontos de falha com dados mockados em memória. Falta integração com vCenter API e Hyper-V WMI/PowerShell para coleta real.",
+    category: "inconsistencia",
+    severity: "medium",
+    status: "aberto",
+    detectedAt: new Date("2026-06-15T10:00:00"),
+    detectedInVersion: "v1.4.0",
+    evidences: [
+      {
+        file: "src/pages/HypervisorsPage.tsx",
+        snippet: "const HOSTS: HypervisorHost[] = [ /* dados mockados em memória */ ];",
+      },
+    ],
+    remediation: "Implementar coletor backend (vCenter REST + Hyper-V WinRM) e persistir snapshot em tabela hypervisor_hosts.",
+  },
 ];
 
 const SEVERITY_STYLES: Record<Severity, string> = {
