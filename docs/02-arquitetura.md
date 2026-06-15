@@ -154,6 +154,7 @@ disph-aiops/
 | `/`               | `Index`             | autenticado                   | Dashboard consolidado             |
 | `/incidents`      | `IncidentsPage`     | autenticado                   | Gestão de incidentes              |
 | `/infrastructure` | `InfrastructurePage`| `admin`, `operator`           | Inventário multi-cloud            |
+| `/hypervisors`    | `HypervisorsPage`   | `admin`, `operator`, `viewer` | Monitoramento VMware/Hyper-V e pontos de falha |
 | `/devsecops`      | `DevSecOpsPage`     | `admin`, `operator`           | Pipelines + segurança             |
 | `/audit`          | `AuditPage`         | `admin`, `auditor`            | Logs de auditoria                 |
 | `/admin`          | `AdminPage`         | `admin`                       | LDAP, SMTP, SEI, RBAC, integrações |

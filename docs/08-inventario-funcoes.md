@@ -11,6 +11,7 @@
 | 1  | `/`               | `Index`               | autenticado         | Dashboard com KPIs, gráficos e AI chat           |
 | 2  | `/incidents`      | `IncidentsPage`       | autenticado         | Tabela de incidentes + criação + remediação      |
 | 3  | `/infrastructure` | `InfrastructurePage`  | admin, operator     | Inventário multi-cloud de clusters e nós         |
+| 3b | `/hypervisors`    | `HypervisorsPage`     | admin, operator, viewer | Hosts VMware/Hyper-V, VMs em risco e pontos de falha (mock) |
 | 4  | `/devsecops`      | `DevSecOpsPage`       | admin, operator     | Pipelines GitLab, scans SonarQube/Quay           |
 | 5  | `/audit`          | `AuditPage`           | admin, auditor      | Logs de auditoria filtrados (LGPD)               |
 | 6  | `/admin`          | `AdminPage`           | admin               | **Centro de Administração** (ver doc 11)         |
