@@ -20,6 +20,7 @@ const navItems = [
   { label: "Agentes", path: "/agents", icon: Bot },
   { label: "Skills", path: "/skills-catalog", icon: Wrench },
   { label: "Infraestrutura", path: "/infrastructure", icon: Server },
+  { label: "Hypervisores", path: "/hypervisors", icon: Server },
   { label: "DevSecOps", path: "/devsecops", icon: Shield },
   { label: "Auditoria", path: "/audit", icon: ShieldCheck },
   { label: "Auditoria Sistema", path: "/system-audit", icon: ClipboardCheck },

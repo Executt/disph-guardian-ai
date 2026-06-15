@@ -154,7 +154,7 @@ export default function HypervisorsPage() {
               <SelectItem value="hyperv">Microsoft Hyper-V</SelectItem>
             </SelectContent>
           </Select>
-          <EnvironmentFilter value={envFilter} onChange={setEnvFilter} />
+          <EnvironmentFilter selected={envFilter} onChange={setEnvFilter} />
           <Input
             placeholder="Buscar host/cluster..."
             value={query}
