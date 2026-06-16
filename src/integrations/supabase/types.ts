@@ -521,6 +521,144 @@ export type Database = {
         }
         Relationships: []
       }
+      hypervisor_failure_points: {
+        Row: {
+          category: string
+          created_at: string
+          detected_at: string
+          environment_id: string | null
+          id: string
+          impact: string | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          detected_at?: string
+          environment_id?: string | null
+          id?: string
+          impact?: string | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          detected_at?: string
+          environment_id?: string | null
+          id?: string
+          impact?: string | null
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypervisor_failure_points_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "monitored_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hypervisor_hosts: {
+        Row: {
+          cluster: string | null
+          cpu_pct: number | null
+          created_at: string
+          datastore_pct: number | null
+          environment_id: string | null
+          hostname: string
+          id: string
+          last_check_at: string
+          platform: string
+          ram_pct: number | null
+          status: string
+          updated_at: string
+          uptime_seconds: number | null
+        }
+        Insert: {
+          cluster?: string | null
+          cpu_pct?: number | null
+          created_at?: string
+          datastore_pct?: number | null
+          environment_id?: string | null
+          hostname: string
+          id?: string
+          last_check_at?: string
+          platform: string
+          ram_pct?: number | null
+          status?: string
+          updated_at?: string
+          uptime_seconds?: number | null
+        }
+        Update: {
+          cluster?: string | null
+          cpu_pct?: number | null
+          created_at?: string
+          datastore_pct?: number | null
+          environment_id?: string | null
+          hostname?: string
+          id?: string
+          last_check_at?: string
+          platform?: string
+          ram_pct?: number | null
+          status?: string
+          updated_at?: string
+          uptime_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypervisor_hosts_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "monitored_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hypervisor_vms: {
+        Row: {
+          created_at: string
+          host_id: string | null
+          id: string
+          last_check_at: string
+          name: string
+          recommendation: string | null
+          severity: string
+          symptom: string
+        }
+        Insert: {
+          created_at?: string
+          host_id?: string | null
+          id?: string
+          last_check_at?: string
+          name: string
+          recommendation?: string | null
+          severity?: string
+          symptom: string
+        }
+        Update: {
+          created_at?: string
+          host_id?: string | null
+          id?: string
+          last_check_at?: string
+          name?: string
+          recommendation?: string | null
+          severity?: string
+          symptom?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypervisor_vms_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "hypervisor_hosts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidents: {
         Row: {
           assigned_to: string | null
