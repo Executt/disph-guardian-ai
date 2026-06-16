@@ -338,3 +338,13 @@ Padrão em todas as seções:
 **Provedores ITSM ativos:** GLPI, Jira, ServiceNow, CITSmart, Freshservice, Azure DevOps.
 
 **Canais de notificação ativos:** Teams (com cards especializados deploy/guardrail), Slack, Discord, Mattermost, Telegram, WhatsApp Business, e fan-out `notify_multi_channel`.
+
+## Hypervisores — Coletor real (v1.5.0)
+
+Secrets:
+- `HYPERVISOR_AGENT_TOKEN` (obrigatório) — usado pelo agente on-prem e pela edge `hypervisor-ingest`.
+- Opcionais para coleta direta via `hypervisor-collect`: `VSPHERE_URL`, `VSPHERE_USER`, `VSPHERE_PASS`, `HYPERV_WINRM_URL`, `HYPERV_USER`, `HYPERV_PASS`.
+
+Agente on-prem: `disph-aiops-backend/agents/hypervisor_agent.py` (pyVmomi + pywinrm), loop de 60s, publica em `hypervisor-ingest`. Recomendado quando não houver conectividade direta da edge function aos vCenters/Hyper-V hosts.
+
+Tabelas: `hypervisor_hosts`, `hypervisor_vms`, `hypervisor_failure_points` (Realtime habilitado; leitura para admin/operator/viewer/auditor).

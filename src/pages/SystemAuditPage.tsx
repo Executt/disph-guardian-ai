@@ -260,19 +260,21 @@ toast.error("Falha ao consultar o assistente DISPH", { description: err.message 
     id: "DISPH-AUD-011",
     title: "Hypervisores (VMware/Hyper-V) sem coletor real — somente mock",
     description:
-      "Nova página /hypervisors exibe hosts, VMs em risco e pontos de falha com dados mockados em memória. Falta integração com vCenter API e Hyper-V WMI/PowerShell para coleta real.",
+      "Página /hypervisors exibia dados mockados. Implementado coletor on-prem (pyVmomi/pywinrm) e edge functions hypervisor-ingest (autenticada por x-agent-token) e hypervisor-collect (admin/operator). Dados agora persistem em hypervisor_hosts/vms/failure_points com RLS e Realtime.",
     category: "inconsistencia",
     severity: "medium",
-    status: "aberto",
+    status: "resolvido",
     detectedAt: new Date("2026-06-15T10:00:00"),
+    resolvedAt: new Date("2026-06-16T18:45:00"),
     detectedInVersion: "v1.4.0",
+    resolvedInVersion: "v1.5.0",
     evidences: [
-      {
-        file: "src/pages/HypervisorsPage.tsx",
-        snippet: "const HOSTS: HypervisorHost[] = [ /* dados mockados em memória */ ];",
-      },
+      { file: "supabase/functions/hypervisor-ingest/index.ts", snippet: "Upsert via service role com onConflict platform,hostname" },
+      { file: "supabase/functions/hypervisor-collect/index.ts", snippet: "Trigger admin/operator; usa VSPHERE_* e HYPERV_* secrets" },
+      { file: "disph-aiops-backend/agents/hypervisor_agent.py", snippet: "Loop 60s coletando pyVmomi/pywinrm e POST ao ingest" },
+      { file: "src/pages/HypervisorsPage.tsx", snippet: "supabase.from('hypervisor_hosts').select + realtime channel" },
     ],
-    remediation: "Implementar coletor backend (vCenter REST + Hyper-V WinRM) e persistir snapshot em tabela hypervisor_hosts.",
+    remediation: "Concluído. Próximo: enriquecer coleta de datastores e snapshots no agente.",
   },
 ];
 

@@ -221,3 +221,19 @@ Comunicação **frontend → sidecar** sempre passa por uma Edge Function como p
 - OpenAI: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.2`.
 
 **Sidecar Python (`disph-aiops-backend`)** expõe `/skills` (registry), `/execute` (run skill), `/health`. Os nomes das skills agora coincidem com o catálogo frontend (`trigger_ansible_playbook`, `k8s_scale_deployment`, `create_gitlab_mr`, etc.).
+
+## Edge Functions — Hypervisores (v1.5.0)
+
+| Função | Auth | Descrição |
+|---|---|---|
+| `POST /functions/v1/hypervisor-ingest` | `x-agent-token: $HYPERVISOR_AGENT_TOKEN` | Recebe `{hosts, vms, failure_points}` do agente on-prem e faz upsert via service role. |
+| `POST /functions/v1/hypervisor-collect` | Bearer JWT (role `admin`/`operator`) | Coleta direta via secrets `VSPHERE_URL/USER/PASS` e `HYPERV_WINRM_URL/USER/PASS`. Retorna 412 se nenhum coletor estiver configurado. |
+
+Payload `hypervisor-ingest`:
+```json
+{
+  "hosts":[{"platform":"vmware","hostname":"esxi01","cluster":"CLU-A","cpu_pct":71,"ram_pct":80,"datastore_pct":62,"uptime_seconds":1234567,"status":"warn","environment_id":null}],
+  "vms":[{"hostname":"esxi01","name":"vm-db","symptom":"Ballooning 4GB","severity":"warn","recommendation":"Aumentar reserva"}],
+  "failure_points":[{"category":"Storage","title":"Latência DS-01 > 25ms","severity":"crit","impact":"8 VMs"}]
+}
+```
