@@ -521,6 +521,106 @@ export type Database = {
         }
         Relationships: []
       }
+      hypervisor_agent_logs: {
+        Row: {
+          agent_name: string
+          created_at: string
+          details: Json | null
+          environment_id: string | null
+          id: string
+          level: string
+          message: string
+          platform: string
+        }
+        Insert: {
+          agent_name: string
+          created_at?: string
+          details?: Json | null
+          environment_id?: string | null
+          id?: string
+          level?: string
+          message: string
+          platform: string
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string
+          details?: Json | null
+          environment_id?: string | null
+          id?: string
+          level?: string
+          message?: string
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypervisor_agent_logs_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "monitored_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hypervisor_agent_status: {
+        Row: {
+          agent_name: string
+          created_at: string
+          environment_id: string | null
+          error_count_24h: number
+          hostname: string | null
+          id: string
+          last_collect_at: string | null
+          last_error_at: string | null
+          last_error_message: string | null
+          last_success_at: string | null
+          platform: string
+          status: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          agent_name: string
+          created_at?: string
+          environment_id?: string | null
+          error_count_24h?: number
+          hostname?: string | null
+          id?: string
+          last_collect_at?: string | null
+          last_error_at?: string | null
+          last_error_message?: string | null
+          last_success_at?: string | null
+          platform: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string
+          environment_id?: string | null
+          error_count_24h?: number
+          hostname?: string | null
+          id?: string
+          last_collect_at?: string | null
+          last_error_at?: string | null
+          last_error_message?: string | null
+          last_success_at?: string | null
+          platform?: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hypervisor_agent_status_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "monitored_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hypervisor_failure_points: {
         Row: {
           category: string
