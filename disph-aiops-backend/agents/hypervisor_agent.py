@@ -15,13 +15,16 @@ Dependências opcionais: pyVmomi (vSphere), pywinrm (Hyper-V).
 Sem essas libs, o coletor envia apenas os hosts que conseguir.
 """
 from __future__ import annotations
-import os, time, json, urllib.request, ssl, traceback
+import os, time, json, socket, urllib.request, ssl, traceback
 from typing import Any
 
 INGEST_URL = (os.getenv("SUPABASE_FUNCTIONS_URL", "").rstrip("/") + "/hypervisor-ingest")
 TOKEN = os.getenv("HYPERVISOR_AGENT_TOKEN", "")
 ENV_ID = os.getenv("ENVIRONMENT_ID") or None
 INTERVAL = int(os.getenv("INTERVAL_SECONDS", "60"))
+AGENT_NAME = os.getenv("AGENT_NAME", f"agent-{socket.gethostname()}")
+AGENT_VERSION = os.getenv("AGENT_VERSION", "1.6.0")
+HOSTNAME = socket.gethostname()
 
 
 def collect_vsphere() -> tuple[list[dict], list[dict], list[dict]]:
@@ -136,21 +139,51 @@ def post_ingest(payload: dict[str, Any]) -> None:
 
 
 def tick() -> None:
-    vh, vv, vf = collect_vsphere()
-    hh, hv, hf = collect_hyperv()
+    logs: list[dict] = []
+    started = time.time()
+
+    def log(level: str, platform: str, message: str, details: dict | None = None):
+        logs.append({
+            "agent_name": AGENT_NAME, "platform": platform,
+            "environment_id": ENV_ID, "level": level,
+            "message": message, "details": details,
+        })
+
+    log("info", "vsphere", "ciclo iniciado")
+    try:
+        vh, vv, vf = collect_vsphere()
+    except Exception as e:
+        log("error", "vsphere", f"falha coleta vSphere: {e}")
+        vh, vv, vf = [], [], []
+    try:
+        hh, hv, hf = collect_hyperv()
+    except Exception as e:
+        log("error", "hyperv", f"falha coleta Hyper-V: {e}")
+        hh, hv, hf = [], [], []
+
+    elapsed = round(time.time() - started, 2)
+    log("info", "vsphere", f"vSphere: {len(vh)} hosts, {len(vv)} VMs em {elapsed}s")
+    log("info", "hyperv", f"Hyper-V: {len(hh)} hosts em {elapsed}s")
+
     payload = {
-        "hosts": vh + hh,
-        "vms": vv + hv,
-        "failure_points": vf + hf,
+        "hosts": vh + hh, "vms": vv + hv, "failure_points": vf + hf,
+        "logs": logs,
     }
-    if not (payload["hosts"] or payload["vms"] or payload["failure_points"]):
-        print("nada para enviar")
-        return
-    post_ingest(payload)
+
+    for platform, has_data in (("vsphere", bool(vh or vv)), ("hyperv", bool(hh))):
+        had_error = any(l["level"] == "error" and l["platform"] == platform for l in logs)
+        payload["agent"] = {
+            "agent_name": AGENT_NAME, "platform": platform,
+            "environment_id": ENV_ID, "hostname": HOSTNAME, "version": AGENT_VERSION,
+            "status": "degraded" if had_error else ("online" if has_data else "degraded"),
+            "last_error_message": next((l["message"] for l in logs if l["level"] == "error" and l["platform"] == platform), None),
+        }
+        post_ingest(payload)
+        payload["hosts"], payload["vms"], payload["failure_points"], payload["logs"] = [], [], [], []
 
 
 if __name__ == "__main__":
-    print(f"hypervisor_agent iniciando; intervalo={INTERVAL}s ingest={INGEST_URL}")
+    print(f"hypervisor_agent {AGENT_VERSION} iniciando; intervalo={INTERVAL}s ingest={INGEST_URL}")
     while True:
         try:
             tick()
