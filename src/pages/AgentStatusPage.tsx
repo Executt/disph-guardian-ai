@@ -163,10 +163,10 @@ export default function AgentStatusPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard label="Agentes Online" value={String(kpis.online)} icon={CheckCircle2} variant="success" />
-        <MetricCard label="Degradados" value={String(kpis.degraded)} icon={AlertTriangle} variant="warning" />
-        <MetricCard label="Offline" value={String(kpis.offline)} icon={AlertTriangle} variant="critical" />
-        <MetricCard label="Erros (24h)" value={String(kpis.errors24h)} icon={Activity} variant={kpis.errors24h ? "warning" : "default"} />
+        <MetricCard title="Agentes Online" value={kpis.online} icon={CheckCircle2} trend="up" />
+        <MetricCard title="Degradados" value={kpis.degraded} icon={AlertTriangle} trend={kpis.degraded ? "down" : "neutral"} />
+        <MetricCard title="Offline" value={kpis.offline} icon={AlertTriangle} trend={kpis.offline ? "down" : "neutral"} />
+        <MetricCard title="Erros (24h)" value={kpis.errors24h} icon={Activity} trend={kpis.errors24h ? "down" : "neutral"} />
       </div>
 
       {/* Filtros */}
