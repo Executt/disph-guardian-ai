@@ -15,6 +15,7 @@ import {
 
 const navItems = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
+  { label: "Visão Segurança", path: "/security-overview", icon: ShieldCheck },
   { label: "Incidentes", path: "/incidents", icon: AlertTriangle },
   { label: "AR", path: "/ar", icon: ShieldAlert },
   { label: "Agentes", path: "/agents", icon: Bot },
