@@ -20,6 +20,7 @@ import SkillsCatalogPage from "@/pages/SkillsCatalogPage";
 import SystemAuditPage from "@/pages/SystemAuditPage";
 import HypervisorsPage from "@/pages/HypervisorsPage";
 import AgentStatusPage from "@/pages/AgentStatusPage";
+import SecurityOverviewPage from "@/pages/SecurityOverviewPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
