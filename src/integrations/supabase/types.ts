@@ -772,6 +772,7 @@ export type Database = {
           service: string | null
           severity: Database["public"]["Enums"]["incident_severity"]
           source: string
+          stage: Database["public"]["Enums"]["incident_stage"]
           status: Database["public"]["Enums"]["incident_status"]
           title: string
           updated_at: string
@@ -788,6 +789,7 @@ export type Database = {
           service?: string | null
           severity?: Database["public"]["Enums"]["incident_severity"]
           source?: string
+          stage?: Database["public"]["Enums"]["incident_stage"]
           status?: Database["public"]["Enums"]["incident_status"]
           title: string
           updated_at?: string
@@ -804,6 +806,7 @@ export type Database = {
           service?: string | null
           severity?: Database["public"]["Enums"]["incident_severity"]
           source?: string
+          stage?: Database["public"]["Enums"]["incident_stage"]
           status?: Database["public"]["Enums"]["incident_status"]
           title?: string
           updated_at?: string
@@ -849,6 +852,87 @@ export type Database = {
           total_assets?: number
           type?: Database["public"]["Enums"]["environment_type"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      nvd_vulnerabilities: {
+        Row: {
+          cpe_matches: Json
+          cve_id: string
+          cvss_score: number | null
+          cvss_vector: string | null
+          cwe: string | null
+          last_modified: string | null
+          matched_watch_ids: string[]
+          published_at: string | null
+          refs: Json
+          severity: string | null
+          summary: string | null
+          synced_at: string
+        }
+        Insert: {
+          cpe_matches?: Json
+          cve_id: string
+          cvss_score?: number | null
+          cvss_vector?: string | null
+          cwe?: string | null
+          last_modified?: string | null
+          matched_watch_ids?: string[]
+          published_at?: string | null
+          refs?: Json
+          severity?: string | null
+          summary?: string | null
+          synced_at?: string
+        }
+        Update: {
+          cpe_matches?: Json
+          cve_id?: string
+          cvss_score?: number | null
+          cvss_vector?: string | null
+          cwe?: string | null
+          last_modified?: string | null
+          matched_watch_ids?: string[]
+          published_at?: string | null
+          refs?: Json
+          severity?: string | null
+          summary?: string | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      nvd_watchlist: {
+        Row: {
+          category: string | null
+          created_at: string
+          enabled: boolean
+          id: string
+          kind: string
+          label: string
+          severity_floor: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind: string
+          label: string
+          severity_floor?: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind?: string
+          label?: string
+          severity_floor?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }
@@ -1015,6 +1099,12 @@ export type Database = {
         | "dr"
         | "sandbox"
       incident_severity: "critical" | "high" | "medium" | "low"
+      incident_stage:
+        | "identified"
+        | "contained"
+        | "eradicated"
+        | "recovered"
+        | "closed"
       incident_status:
         | "open"
         | "investigating"
@@ -1203,6 +1293,13 @@ export const Constants = {
         "sandbox",
       ],
       incident_severity: ["critical", "high", "medium", "low"],
+      incident_stage: [
+        "identified",
+        "contained",
+        "eradicated",
+        "recovered",
+        "closed",
+      ],
       incident_status: [
         "open",
         "investigating",
