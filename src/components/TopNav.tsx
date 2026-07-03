@@ -18,6 +18,7 @@ const navItems = [
   { label: "Visão Segurança", path: "/security-overview", icon: ShieldCheck },
   { label: "Incidentes", path: "/incidents", icon: AlertTriangle },
   { label: "AR", path: "/ar", icon: ShieldAlert },
+  { label: "Vulnerabilidades", path: "/vulnerabilities", icon: Bug },
   { label: "Agentes", path: "/agents", icon: Bot },
   { label: "Skills", path: "/skills-catalog", icon: Wrench },
   { label: "Infraestrutura", path: "/infrastructure", icon: Server },
