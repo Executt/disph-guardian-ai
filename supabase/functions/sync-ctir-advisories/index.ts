@@ -16,7 +16,8 @@ const corsHeaders = {
 };
 
 const BASE = "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes";
-// gov.br bloqueia UAs não-browser com 403. Usamos UA de browser real.
+// Fallback: novo caminho institucional em /gsi/ para alertas.
+const BASE_GSI = "https://www.gov.br/gsi/pt-br/assuntos/ctir/alertas-e-recomendacoes";
 const UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -175,11 +176,23 @@ Deno.serve(async (req) => {
         .eq("feed_url", feed.url)
         .maybeSingle();
 
-      const result = await conditionalFetch(
+      let result = await conditionalFetch(
         feed.url,
         force ? null : state?.etag ?? null,
         force ? null : state?.last_modified ?? null,
       );
+
+      // Fallback para GSI se o feed CTIR falhar ou vier vazio
+      if ((!result.modified && result.status !== 304) || (result.modified && result.items.length === 0)) {
+        const kindPath = feed.kind === "alert" ? "alertas" : "recomendacoes";
+        const gsiUrl = `${BASE_GSI}/${kindPath}/${feed.year}/RSS`;
+        console.log(`[sync] fallback GSI ${gsiUrl}`);
+        const alt = await conditionalFetch(gsiUrl, null, null);
+        if (alt.modified && alt.items.length > 0) {
+          result = alt;
+          feed.url = gsiUrl; // grava state sob a URL que efetivamente serviu
+        }
+      }
 
       if (result.status === 304) {
         totals.feeds_skipped_304++;

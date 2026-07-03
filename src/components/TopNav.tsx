@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, AlertTriangle, Server, Shield, ShieldCheck,
-  Settings, LogOut, User, ChevronDown, Menu, X, Brain, Users, ShieldAlert, Bot, Wrench, ClipboardCheck, Activity
+  Settings, LogOut, User, ChevronDown, Menu, X, Brain, Users, ShieldAlert, Bot, Wrench, ClipboardCheck, Activity, Bug
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ const navItems = [
   { label: "Visão Segurança", path: "/security-overview", icon: ShieldCheck },
   { label: "Incidentes", path: "/incidents", icon: AlertTriangle },
   { label: "AR", path: "/ar", icon: ShieldAlert },
+  { label: "Vulnerabilidades", path: "/vulnerabilities", icon: Bug },
   { label: "Agentes", path: "/agents", icon: Bot },
   { label: "Skills", path: "/skills-catalog", icon: Wrench },
   { label: "Infraestrutura", path: "/infrastructure", icon: Server },

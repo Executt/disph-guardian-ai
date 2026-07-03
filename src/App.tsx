@@ -21,6 +21,7 @@ import SystemAuditPage from "@/pages/SystemAuditPage";
 import HypervisorsPage from "@/pages/HypervisorsPage";
 import AgentStatusPage from "@/pages/AgentStatusPage";
 import SecurityOverviewPage from "@/pages/SecurityOverviewPage";
+import VulnerabilitiesPage from "@/pages/VulnerabilitiesPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/security-overview" element={<SecurityOverviewPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/ar" element={<ARPage />} />
+              <Route path="/vulnerabilities" element={<VulnerabilitiesPage />} />
               <Route
                 path="/agents"
                 element={

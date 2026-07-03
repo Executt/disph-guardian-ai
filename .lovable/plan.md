@@ -1,30 +1,23 @@
-# DISPH Guardian AI — Roadmap (pós-auditoria Jun/2026)
+## Plano (spec-driven, ≤15 linhas)
 
-## Concluído nesta auditoria
-- [x] Fix bug: `/audit` aceita role `auditor`.
-- [x] Removido `src/components/AppSidebar.tsx` (dead code).
-- [x] Removido `Toaster` duplicado em `App.tsx` (mantido Sonner).
-- [x] Criado `src/lib/aiModels.ts` como fonte única de modelos.
-- [x] `AIChatConsole`, `SettingsPage`, `AdminPage`, `AgentsPage`, `AgentDetailPage` importam de `aiModels`.
-- [x] `agentSkills.ts` renomeado para padrão backend; adicionadas 7 skills BE-only.
-- [x] `console.error` → `toast.error` em `AIChatConsole`.
-- [x] Docs 02, 03, 04, 08, 09, 11 atualizados.
+**1. Correção CTIR (bloqueio da UI)**
+- Verificar coluna `asset_count` em `monitored_environments`; se ausente, migração adiciona `asset_count int default 0`.
+- Ajustar `SecurityOverviewPage` e `ARPage` para fallback `?? 0` sem quebrar.
 
-## Top 8 Evoluções (backlog priorizado)
+**2. Fallback de fonte CTIR**
+- `sync-ctir-advisories`: se feed primário (`/ctir/...`) retornar 0 itens ou 404, tentar `https://www.gov.br/gsi/pt-br/assuntos/ctir/alertas/{ano}/RSS` como secundário. Registrar em `ctir_sync_state.feed_url` real usado.
 
-| # | Item | Esforço | Impacto |
-|---|---|---|---|
-| 1 | **Confirm dialog** para skills com `riskLevel ≥ 4` antes da execução | S | Alto (segurança) |
-| 2 | **TypeScript types** do sidecar Python (gerar `.d.ts` a partir do `/skills` endpoint) | M | Médio |
-| 3 | **UI para `advisory_environment_assessments`** — exibir aplicabilidade de cada AR | M | Alto (CTIR) |
-| 4 | **Implementar SEI** (skills `open_sei_processo`, `assina_sei`) — atualmente roadmap | L | Médio (gov) |
-| 5 | **Implementar Freshservice e Azure DevOps** de verdade (skeletons existem) | M | Médio |
-| 6 | **Audit log do agente** — visualização gráfica das `agent_executions` (timeline, custo) | M | Alto (governança) |
-| 7 | **Cost tracker** por modelo LLM (campos em `ai_conversations` + dashboard) | M | Médio |
-| 8 | **Sincronização automática** do registry backend ↔ `agentSkills.ts` (script CI) | S | Médio (manutenção) |
-| 9 | ~~**Coletor real de hypervisores**~~ ✅ **Concluído v1.5.0** — agente `hypervisor_agent.py` (pyVmomi/pywinrm) + edge functions `hypervisor-ingest`/`hypervisor-collect` + tabelas `hypervisor_hosts/vms/failure_points` com RLS e Realtime | L | Alto (observabilidade) |
-| 10 | Enriquecer coletor: datastores, snapshots antigos, ballooning, certificados vCenter | M | Médio |
+**3. Funil expandido em `/security-overview`**
+- Migração: enum `incident_stage` com `identified|contained|eradicated|recovered|closed`; coluna `stage incident_stage default 'identified'` em `incidents`; backfill por `status`.
+- `SecurityOverviewPage`: 5 estágios NIST com contagem por `stage`, conversão entre etapas e taxa MTTR simples.
 
-## Fora de escopo / decisões registradas
-- Snake_case do backend Python mantido; mapeamento por nome no frontend.
-- Skills BE seguem padrão `{categoria}_{ação}`; FE alinhado.
+**4. NVD 2.0 + Watchlist**
+- Migração: `nvd_watchlist(id, label, kind[vendor|product|cpe|keyword], value, enabled, default_severity_floor)`, `nvd_vulnerabilities(cve_id pk, published_at, last_modified, cvss_score, severity, summary, cwe, references jsonb, matched_watch_ids uuid[], synced_at)`. GRANTs + RLS auth-only.
+- Seed watchlist: Windows, Linux, Kubernetes, Docker, PostgreSQL, MySQL, Oracle DB, SQL Server, MongoDB, Supabase, Node.js, Python, Java, Go, React, WordPress, OpenShift/OKD, VMware, Cisco, Fortinet, OpenSSH, Apache, Nginx, Chrome, Firefox, Edge, Brave, LibreOffice, MS Office, Adobe Reader, Teams, Google Meet.
+- Edge function `sync-nvd-vulnerabilities`: usa `services.nvd.nist.gov/rest/json/cves/2.0` com `keywordSearch`/`cpeName`, janela `lastModStartDate/EndDate` incremental (state em `ctir_sync_state` reaproveitado por `feed_url='nvd:{watchId}'`), sem API key (5 req/30s, sleep 6s entre chamadas). Se secret `NVD_API_KEY` existir, usa (50 req/30s).
+- Página `/vulnerabilities` (nova aba dentro de `/ar` como sub-tab "NVD Watchlist") lista CVEs + gerenciamento de watchlist.
+
+**5. Metodologia agentes**
+- Copiar `.md` anexados para `docs/agents/` como referência (não vira skill executável).
+
+Aprovar para eu executar em ordem: migrações → edge functions → UI.
