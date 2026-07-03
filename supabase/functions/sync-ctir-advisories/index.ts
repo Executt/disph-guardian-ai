@@ -16,8 +16,10 @@ const corsHeaders = {
 };
 
 const BASE = "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes";
-// gov.br bloqueia UAs não-browser com 403. Usamos UA de browser real.
+// Fallback: novo caminho institucional em /gsi/ para alertas.
+const BASE_GSI = "https://www.gov.br/gsi/pt-br/assuntos/ctir/alertas-e-recomendacoes";
 const UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 type Severity = "low" | "medium" | "high" | "critical";
