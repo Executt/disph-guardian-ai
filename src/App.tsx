@@ -45,6 +45,7 @@ const App = () => (
               <Route path="/security-overview" element={<SecurityOverviewPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/ar" element={<ARPage />} />
+              <Route path="/vulnerabilities" element={<VulnerabilitiesPage />} />
               <Route
                 path="/agents"
                 element={
