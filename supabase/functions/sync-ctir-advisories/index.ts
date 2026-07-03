@@ -176,11 +176,23 @@ Deno.serve(async (req) => {
         .eq("feed_url", feed.url)
         .maybeSingle();
 
-      const result = await conditionalFetch(
+      let result = await conditionalFetch(
         feed.url,
         force ? null : state?.etag ?? null,
         force ? null : state?.last_modified ?? null,
       );
+
+      // Fallback para GSI se o feed CTIR falhar ou vier vazio
+      if ((!result.modified && result.status !== 304) || (result.modified && result.items.length === 0)) {
+        const kindPath = feed.kind === "alert" ? "alertas" : "recomendacoes";
+        const gsiUrl = `${BASE_GSI}/${kindPath}/${feed.year}/RSS`;
+        console.log(`[sync] fallback GSI ${gsiUrl}`);
+        const alt = await conditionalFetch(gsiUrl, null, null);
+        if (alt.modified && alt.items.length > 0) {
+          result = alt;
+          feed.url = gsiUrl; // grava state sob a URL que efetivamente serviu
+        }
+      }
 
       if (result.status === 304) {
         totals.feeds_skipped_304++;
