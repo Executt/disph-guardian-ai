@@ -6,8 +6,17 @@ import { MetricCard } from "@/components/MetricCard";
 import { supabase } from "@/integrations/supabase/client";
 import { ShieldCheck, AlertTriangle, Activity, Target, CheckCircle2, Clock, XCircle } from "lucide-react";
 
-type Stage = { key: string; label: string; count: number; color: string };
+type StageKey = "identified" | "contained" | "eradicated" | "recovered" | "closed";
+type Stage = { key: StageKey; label: string; count: number; color: string };
 type ComplianceItem = { label: string; value: number; total: number; hint?: string };
+
+const STAGE_META: { key: StageKey; label: string; color: string }[] = [
+  { key: "identified",  label: "Identificado", color: "hsl(199,80%,50%)" },
+  { key: "contained",   label: "Contido",      color: "hsl(38,90%,55%)" },
+  { key: "eradicated",  label: "Erradicado",   color: "hsl(280,60%,55%)" },
+  { key: "recovered",   label: "Recuperado",   color: "hsl(142,60%,45%)" },
+  { key: "closed",      label: "Encerrado",    color: "hsl(142,55%,38%)" },
+];
 
 export default function SecurityOverviewPage() {
   const [incidents, setIncidents] = useState<any[]>([]);
@@ -19,10 +28,10 @@ export default function SecurityOverviewPage() {
   useEffect(() => {
     (async () => {
       const [inc, ass, adv, env] = await Promise.all([
-        supabase.from("incidents").select("id,severity,status,created_at,environment"),
+        supabase.from("incidents").select("id,severity,status,stage,created_at,resolved_at,environment"),
         supabase.from("advisory_environment_assessments").select("id,status,advisory_id,environment_id"),
         supabase.from("ctir_advisories").select("id,severity,code"),
-        supabase.from("monitored_environments").select("id,name,asset_count"),
+        supabase.from("monitored_environments").select("id,name,total_assets"),
       ]);
       setIncidents(inc.data ?? []);
       setAssessments(ass.data ?? []);
@@ -32,31 +41,34 @@ export default function SecurityOverviewPage() {
     })();
   }, []);
 
-  // Funil de estágios (Identificado → Encerrado)
+  // Funil NIST: cumulativo por ordem de progressão
   const stages: Stage[] = useMemo(() => {
-    const by = (fn: (s: string) => boolean) => incidents.filter(i => fn((i.status ?? "").toLowerCase())).length;
-    const identified = incidents.length;
-    const triaged = by(s => ["investigating", "in_progress", "triaged", "acknowledged", "mitigating", "resolved", "closed"].includes(s));
-    const mitigating = by(s => ["in_progress", "mitigating", "resolved", "closed"].includes(s));
-    const resolved = by(s => ["resolved", "closed"].includes(s));
-    const closed = by(s => s === "closed");
-    return [
-      { key: "identified", label: "Identificado", count: identified, color: "hsl(199,80%,50%)" },
-      { key: "triaged", label: "Triado", count: triaged, color: "hsl(199,70%,45%)" },
-      { key: "mitigating", label: "Em Mitigação", count: mitigating, color: "hsl(38,90%,55%)" },
-      { key: "resolved", label: "Resolvido", count: resolved, color: "hsl(142,60%,45%)" },
-      { key: "closed", label: "Encerrado", count: closed, color: "hsl(142,55%,38%)" },
-    ];
+    const order: StageKey[] = ["identified", "contained", "eradicated", "recovered", "closed"];
+    const rank = Object.fromEntries(order.map((k, i) => [k, i])) as Record<StageKey, number>;
+    return STAGE_META.map((meta, i) => {
+      const count = incidents.filter(inc => {
+        const s = (inc.stage ?? "identified") as StageKey;
+        return rank[s] >= i;
+      }).length;
+      return { ...meta, count };
+    });
   }, [incidents]);
 
   const maxStage = Math.max(1, ...stages.map(s => s.count));
 
-  // Compliance CTIR por ambiente
+  // MTTR (média em horas) para incidentes com resolved_at
+  const mttrHours = useMemo(() => {
+    const resolved = incidents.filter(i => i.resolved_at && i.created_at);
+    if (!resolved.length) return null;
+    const totalMs = resolved.reduce((s, i) => s + (new Date(i.resolved_at).getTime() - new Date(i.created_at).getTime()), 0);
+    return Math.round((totalMs / resolved.length) / 3_600_000);
+  }, [incidents]);
+
   const complianceByEnv: ComplianceItem[] = useMemo(() => {
     return environments.map(env => {
       const items = assessments.filter(a => a.environment_id === env.id);
       const ok = items.filter(a => a.status === "compliant").length;
-      return { label: env.name, value: ok, total: items.length, hint: `${env.asset_count ?? 0} ativos` };
+      return { label: env.name, value: ok, total: items.length, hint: `${env.total_assets ?? 0} ativos` };
     });
   }, [environments, assessments]);
 
@@ -68,8 +80,8 @@ export default function SecurityOverviewPage() {
     return { pct: Math.round((ok / total) * 100), ok, pending, nonCompliant, total: assessments.length };
   }, [assessments]);
 
-  const critical = incidents.filter(i => i.severity === "critical" && i.status !== "closed").length;
-  const openCount = incidents.filter(i => !["closed", "resolved"].includes((i.status ?? "").toLowerCase())).length;
+  const critical = incidents.filter(i => i.severity === "critical" && i.stage !== "closed").length;
+  const openCount = incidents.filter(i => i.stage !== "closed").length;
   const criticalAdvisories = advisories.filter(a => (a.severity ?? "").toLowerCase() === "critical").length;
 
   return (
@@ -78,7 +90,7 @@ export default function SecurityOverviewPage() {
         <div>
           <h1 className="text-2xl font-bold heading text-foreground">Visão Geral de Segurança</h1>
           <p className="text-sm text-muted-foreground font-mono mt-1">
-            Funil de incidentes · Compliance CTIR · Correlação por ambiente
+            Funil NIST · Compliance CTIR · Correlação por ambiente
           </p>
         </div>
         <Badge variant="outline" className="font-mono text-[10px]">
@@ -86,7 +98,6 @@ export default function SecurityOverviewPage() {
         </Badge>
       </header>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Incidentes Abertos" value={openCount} icon={AlertTriangle} trend={openCount > 0 ? "down" : "up"} />
         <MetricCard title="Críticos Ativos" value={critical} icon={Activity} trend={critical > 0 ? "down" : "up"} />
@@ -95,11 +106,10 @@ export default function SecurityOverviewPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Funil */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base heading">Funil de Estágios do Incidente</CardTitle>
-            <CardDescription className="text-xs font-mono">Identificado → Triado → Mitigação → Resolvido → Encerrado</CardDescription>
+            <CardTitle className="text-base heading">Funil NIST de Resposta a Incidentes</CardTitle>
+            <CardDescription className="text-xs font-mono">Identificado → Contido → Erradicado → Recuperado → Encerrado</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {stages.map((s, i) => {
@@ -109,9 +119,7 @@ export default function SecurityOverviewPage() {
                 <div key={s.key} className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-foreground">{s.label}</span>
-                    <span className="text-muted-foreground">
-                      {s.count} · conv. {conv}%
-                    </span>
+                    <span className="text-muted-foreground">{s.count} · conv. {conv}%</span>
                   </div>
                   <div className="h-8 rounded-md bg-muted/40 overflow-hidden relative">
                     <div
@@ -126,31 +134,29 @@ export default function SecurityOverviewPage() {
             })}
             <div className="pt-3 border-t border-border grid grid-cols-3 gap-3 text-center">
               <div>
-                <p className="text-[10px] font-mono text-muted-foreground uppercase">Taxa Resolução</p>
+                <p className="text-[10px] font-mono text-muted-foreground uppercase">Taxa de Recuperação</p>
                 <p className="text-lg font-bold text-success">
                   {Math.round((stages[3].count / (stages[0].count || 1)) * 100)}%
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-mono text-muted-foreground uppercase">Em Andamento</p>
-                <p className="text-lg font-bold text-warning">{stages[1].count - stages[3].count}</p>
+                <p className="text-[10px] font-mono text-muted-foreground uppercase">MTTR médio</p>
+                <p className="text-lg font-bold text-primary">{mttrHours != null ? `${mttrHours}h` : "—"}</p>
               </div>
               <div>
-                <p className="text-[10px] font-mono text-muted-foreground uppercase">Backlog</p>
-                <p className="text-lg font-bold text-destructive">{stages[0].count - stages[1].count}</p>
+                <p className="text-[10px] font-mono text-muted-foreground uppercase">Não Encerrados</p>
+                <p className="text-lg font-bold text-warning">{stages[0].count - stages[4].count}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Compliance panel */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base heading">Compliance CTIR</CardTitle>
             <CardDescription className="text-xs font-mono">Aderência de alertas por ambiente</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Circular */}
             <div className="flex items-center justify-center">
               <div className="relative h-32 w-32">
                 <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
