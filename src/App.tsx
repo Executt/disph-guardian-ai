@@ -22,6 +22,7 @@ import HypervisorsPage from "@/pages/HypervisorsPage";
 import AgentStatusPage from "@/pages/AgentStatusPage";
 import SecurityOverviewPage from "@/pages/SecurityOverviewPage";
 import VulnerabilitiesPage from "@/pages/VulnerabilitiesPage";
+import CveDetailPage from "@/pages/CveDetailPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/ar" element={<ARPage />} />
               <Route path="/vulnerabilities" element={<VulnerabilitiesPage />} />
+              <Route path="/vulnerabilities/:cveId" element={<CveDetailPage />} />
               <Route
                 path="/agents"
                 element={

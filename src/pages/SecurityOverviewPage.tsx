@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/MetricCard";
+import SyncStatusPanel from "@/components/SyncStatusPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { ShieldCheck, AlertTriangle, Activity, Target, CheckCircle2, Clock, XCircle } from "lucide-react";
 
