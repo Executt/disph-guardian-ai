@@ -900,6 +900,33 @@ export type Database = {
         }
         Relationships: []
       }
+      nvd_vulnerability_history: {
+        Row: {
+          changed_at: string
+          cve_id: string
+          field: string
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+        }
+        Insert: {
+          changed_at?: string
+          cve_id: string
+          field: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+        }
+        Update: {
+          changed_at?: string
+          cve_id?: string
+          field?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+        }
+        Relationships: []
+      }
       nvd_watchlist: {
         Row: {
           category: string | null
@@ -1008,6 +1035,45 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_alerts: {
+        Row: {
+          created_at: string
+          details: Json
+          id: string
+          kind: string
+          message: string
+          notified_channels: Json
+          resolved_at: string | null
+          severity: string
+          source: string
+          ticket_ref: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          id?: string
+          kind: string
+          message: string
+          notified_channels?: Json
+          resolved_at?: string | null
+          severity?: string
+          source: string
+          ticket_ref?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          id?: string
+          kind?: string
+          message?: string
+          notified_channels?: Json
+          resolved_at?: string | null
+          severity?: string
+          source?: string
+          ticket_ref?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1031,7 +1097,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      sync_health_v: {
+        Row: {
+          feed_url: string | null
+          items_seen: number | null
+          last_fetched_at: string | null
+          last_item_published_at: string | null
+          last_status: number | null
+          source: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          feed_url?: string | null
+          items_seen?: number | null
+          last_fetched_at?: string | null
+          last_item_published_at?: string | null
+          last_status?: number | null
+          source?: never
+          updated_at?: string | null
+        }
+        Update: {
+          feed_url?: string | null
+          items_seen?: number | null
+          last_fetched_at?: string | null
+          last_item_published_at?: string | null
+          last_status?: number | null
+          source?: never
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_any_role: {
