@@ -47,7 +47,7 @@ export default function SyncStatusPanel({ source, functionName }: Props) {
         .limit(10),
     ]);
     setRows((h.data as Health[]) ?? []);
-    setAlerts((a.data as Alert[]) ?? []);
+    setAlerts(((a.data as unknown) as Alert[]) ?? []);
     setLoading(false);
   };
 

@@ -52,8 +52,8 @@ export default function CveDetailPage() {
         supabase.from("nvd_vulnerability_history" as any).select("*").eq("cve_id", cveId).order("changed_at", { ascending: false }),
         supabase.from("nvd_watchlist").select("id,label"),
       ]);
-      setV(vd.data as Vuln | null);
-      setHistory((hd.data as HistoryRow[]) ?? []);
+      setV((vd.data as unknown) as Vuln | null);
+      setHistory(((hd.data as unknown) as HistoryRow[]) ?? []);
       setWatches(Object.fromEntries(((wd.data ?? []) as any[]).map(w => [w.id, w.label])));
       setLoading(false);
     })();
