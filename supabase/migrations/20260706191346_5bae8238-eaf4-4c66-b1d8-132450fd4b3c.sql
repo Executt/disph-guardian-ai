@@ -1,0 +1,1 @@
+ALTER VIEW public.sync_health_v SET (security_invoker = on);
