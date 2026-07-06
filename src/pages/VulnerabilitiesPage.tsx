@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +8,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MetricCard } from "@/components/MetricCard";
+import SyncStatusPanel from "@/components/SyncStatusPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Bug, RefreshCw, Plus, ShieldAlert, Activity, Search } from "lucide-react";
+import { Bug, RefreshCw, Plus, ShieldAlert, Activity, Search, Trash2 } from "lucide-react";
 
 type Watch = {
   id: string; label: string; kind: string; value: string;
@@ -77,11 +79,25 @@ export default function VulnerabilitiesPage() {
 
   const addWatch = async () => {
     if (!newLabel || !newValue) return toast.error("Informe label e valor");
+    if (newKind === "cpe" && !/^cpe:2\.3:[aho]:/i.test(newValue)) {
+      return toast.error("CPE inválido — deve começar com cpe:2.3:a|h|o:");
+    }
+    const dup = watches.find(w => w.kind === newKind && w.value.toLowerCase() === newValue.toLowerCase());
+    if (dup) return toast.error(`Já existe: "${dup.label}"`);
     const { error } = await supabase.from("nvd_watchlist").insert({
       label: newLabel, value: newValue, kind: newKind, category: "custom",
     });
     if (error) return toast.error(error.message);
+    toast.success("Watch adicionado — será reprocessado no próximo sync");
     setNewLabel(""); setNewValue("");
+    await load();
+  };
+
+  const removeWatch = async (w: Watch) => {
+    if (!confirm(`Remover "${w.label}"?`)) return;
+    const { error } = await supabase.from("nvd_watchlist").delete().eq("id", w.id);
+    if (error) return toast.error(error.message);
+    toast.success("Removido");
     await load();
   };
 
