@@ -298,6 +298,27 @@ Deno.serve(async (req) => {
     details: { ...totals, force, years_back: yearsBack, duration_ms: Date.now() - startedAt },
   });
 
+  // Alertas de inconsistência
+  try {
+    if (totals.errors > 0) {
+      await supabase.functions.invoke("notify-sync-failure", {
+        body: {
+          source: "ctir", kind: "http_error", severity: "error",
+          message: `${totals.errors} feed(s) do CTIR falharam`,
+          details: totals,
+        },
+      });
+    } else if (totals.feeds_changed > 0 && totals.inserted === 0 && totals.updated === 0) {
+      await supabase.functions.invoke("notify-sync-failure", {
+        body: {
+          source: "ctir", kind: "empty_feed", severity: "warning",
+          message: "Feeds retornaram conteúdo mas sem novos itens/alterações",
+          details: totals,
+        },
+      });
+    }
+  } catch (e) { console.warn("notify skip", e); }
+
   return new Response(JSON.stringify({ ok: true, ...totals, duration_ms: Date.now() - startedAt }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

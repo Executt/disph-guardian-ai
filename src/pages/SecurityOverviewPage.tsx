@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/MetricCard";
+import SyncStatusPanel from "@/components/SyncStatusPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { ShieldCheck, AlertTriangle, Activity, Target, CheckCircle2, Clock, XCircle } from "lucide-react";
 
@@ -104,6 +105,10 @@ export default function SecurityOverviewPage() {
         <MetricCard title="Advisories Críticos" value={criticalAdvisories} icon={ShieldCheck} />
         <MetricCard title="Compliance CTIR" value={`${overallCompliance.pct}%`} icon={Target} trend={overallCompliance.pct >= 80 ? "up" : "down"} />
       </div>
+
+      <SyncStatusPanel source="ctir" functionName="sync-ctir-advisories" />
+
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">

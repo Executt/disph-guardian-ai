@@ -174,7 +174,19 @@ Deno.serve(async (req) => {
       await sleep(throttle);
     } catch (e) {
       totals.errors++;
-      console.error(`[nvd] watch ${w.label}`, e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[nvd] watch ${w.label}`, msg);
+      const kind = /NVD 429|NVD 403/.test(msg) ? "rate_limit"
+                 : /timeout|network/i.test(msg) ? "timeout" : "http_error";
+      try {
+        await supabase.functions.invoke("notify-sync-failure", {
+          body: {
+            source: "nvd", kind, severity: kind === "rate_limit" ? "warning" : "error",
+            message: `NVD watch "${w.label}" falhou: ${msg.slice(0, 200)}`,
+            details: { watch_id: w.id, kind: w.kind, value: w.value },
+          },
+        });
+      } catch (_e) { /* noop */ }
     }
   }
 
@@ -183,6 +195,18 @@ Deno.serve(async (req) => {
     resource_type: "nvd_vulnerabilities",
     details: { ...totals, force, days_back: daysBack, duration_ms: Date.now() - startedAt, has_api_key: !!nvdKey },
   });
+
+  if (totals.watches > 0 && totals.cve_seen === 0 && totals.errors === 0) {
+    try {
+      await supabase.functions.invoke("notify-sync-failure", {
+        body: {
+          source: "nvd", kind: "empty_feed", severity: "warning",
+          message: "NVD retornou 0 CVEs em todas as watches",
+          details: totals,
+        },
+      });
+    } catch (_e) { /* noop */ }
+  }
 
   return new Response(JSON.stringify({ ok: true, ...totals, duration_ms: Date.now() - startedAt }), {
     headers: { ...cors, "Content-Type": "application/json" },
