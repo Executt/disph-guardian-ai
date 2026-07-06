@@ -106,6 +106,10 @@ export default function SecurityOverviewPage() {
         <MetricCard title="Compliance CTIR" value={`${overallCompliance.pct}%`} icon={Target} trend={overallCompliance.pct >= 80 ? "up" : "down"} />
       </div>
 
+      <SyncStatusPanel source="ctir" functionName="sync-ctir-advisories" />
+
+
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader>
