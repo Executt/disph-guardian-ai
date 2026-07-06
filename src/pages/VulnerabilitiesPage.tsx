@@ -149,6 +149,7 @@ export default function VulnerabilitiesPage() {
         <TabsList>
           <TabsTrigger value="vulns">CVEs</TabsTrigger>
           <TabsTrigger value="watchlist">Watchlist ({watches.length})</TabsTrigger>
+          <TabsTrigger value="sync">Sincronização</TabsTrigger>
         </TabsList>
 
         <TabsContent value="vulns" className="space-y-3">
@@ -194,9 +195,9 @@ export default function VulnerabilitiesPage() {
                     {filtered.slice(0, 200).map(v => (
                       <TableRow key={v.cve_id}>
                         <TableCell className="font-mono text-xs">
-                          <a href={`https://nvd.nist.gov/vuln/detail/${v.cve_id}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                          <Link to={`/vulnerabilities/${v.cve_id}`} className="text-primary hover:underline">
                             {v.cve_id}
-                          </a>
+                          </Link>
                         </TableCell>
                         <TableCell><Badge variant="outline" className={`text-[10px] font-mono uppercase ${SEV_COLOR[v.severity ?? "none"]}`}>{v.severity ?? "—"}</Badge></TableCell>
                         <TableCell className="font-mono text-xs">{v.cvss_score ?? "—"}</TableCell>
@@ -251,6 +252,7 @@ export default function VulnerabilitiesPage() {
                     <TableHead className="text-[10px] font-mono uppercase">Valor</TableHead>
                     <TableHead className="text-[10px] font-mono uppercase">Categoria</TableHead>
                     <TableHead className="text-[10px] font-mono uppercase">Min. Sev.</TableHead>
+                    <TableHead className="text-[10px] font-mono uppercase w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -259,15 +261,25 @@ export default function VulnerabilitiesPage() {
                       <TableCell><Switch checked={w.enabled} onCheckedChange={v => toggleWatch(w, v)} /></TableCell>
                       <TableCell className="text-xs">{w.label}</TableCell>
                       <TableCell><Badge variant="outline" className="text-[10px] font-mono">{w.kind}</Badge></TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{w.value}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground max-w-[300px] truncate">{w.value}</TableCell>
                       <TableCell className="text-[11px] font-mono text-muted-foreground">{w.category ?? "—"}</TableCell>
                       <TableCell><Badge variant="outline" className={`text-[10px] font-mono uppercase ${SEV_COLOR[w.severity_floor]}`}>{w.severity_floor}</Badge></TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => removeWatch(w)} className="h-7 w-7 p-0">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="sync" className="space-y-3">
+          <SyncStatusPanel source="nvd" functionName="sync-nvd-vulnerabilities" />
+          <SyncStatusPanel source="ctir" functionName="sync-ctir-advisories" />
         </TabsContent>
       </Tabs>
     </div>
