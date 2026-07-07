@@ -2,7 +2,8 @@
 // Strategy:
 //  1. For each feed (alertas/recomendacoes × year), do a conditional GET using
 //     stored ETag / Last-Modified -> 304 means skip entirely.
-//  2. Parse the RSS/RDF, extract items with <dc:date>.
+//  2. Parse the RSS/RDF, extract items with <dc:date>; if CTIR serves HTML,
+//     parse the Plone listing as fallback.
 //  3. Skip items with published_at <= last_item_published_at stored for that feed.
 //  4. Upsert only changed items by `code`. Compare published_at to existing.synced_at-aware row
 //     to skip writes when nothing changed.
@@ -16,8 +17,8 @@ const corsHeaders = {
 };
 
 const BASE = "https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes";
-// Fallback: novo caminho institucional em /gsi/ para alertas.
-const BASE_GSI = "https://www.gov.br/gsi/pt-br/assuntos/ctir/alertas-e-recomendacoes";
+// Fallback: caminho institucional atual em /gsi/ separado por tipo.
+const BASE_GSI = "https://www.gov.br/gsi/pt-br/assuntos/ctir";
 const UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -29,6 +30,28 @@ interface FeedItem {
   title: string;
   description: string;
   published_at: string; // ISO
+}
+
+function decodeHtml(value: string): string {
+  return value
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseBrDate(value: string | null): string {
+  if (!value) return new Date().toISOString();
+  const m = value.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2})h(?:(\d{2}))?/);
+  if (!m) return new Date().toISOString();
+  const [, dd, mm, yyyy, hh, min = "00"] = m;
+  return new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:00-03:00`).toISOString();
 }
 
 function detectSeverity(text: string): Severity {
@@ -90,6 +113,28 @@ function parseRdfItems(xml: string): FeedItem[] {
   return items;
 }
 
+function parseHtmlListing(html: string): FeedItem[] {
+  const items: FeedItem[] = [];
+  const articleRe = /<article\b[\s\S]*?class="[^"]*\bentry\b[^"]*"[\s\S]*?<\/article>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = articleRe.exec(html)) !== null) {
+    const block = m[0];
+    const link = block.match(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!link) continue;
+    const url = link[1].replace(/&amp;/g, "&");
+    const title = decodeHtml(link[2]);
+    const description = decodeHtml(
+      block.match(/<p\b[^>]*class="[^"]*\bdescription\b[^"]*"[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "",
+    );
+    const modified = block.match(/última\s+modifica(?:ç|&ccedil;)ão\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}h\d{0,2})/i)?.[1]
+      ?? block.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}h\d{0,2})/)?.[1]
+      ?? null;
+    if (!title || !url) continue;
+    items.push({ url, title, description, published_at: parseBrDate(modified) });
+  }
+  return items;
+}
+
 interface FeedResult {
   modified: boolean;
   items: FeedItem[];
@@ -117,9 +162,11 @@ async function conditionalFetch(
     };
   }
   const xml = await res.text();
+  const rdfItems = parseRdfItems(xml);
+  const items = rdfItems.length > 0 ? rdfItems : parseHtmlListing(xml);
   return {
     modified: true,
-    items: parseRdfItems(xml),
+    items,
     status: res.status,
     etag: res.headers.get("etag"),
     last_modified: res.headers.get("last-modified"),
@@ -182,10 +229,11 @@ Deno.serve(async (req) => {
         force ? null : state?.last_modified ?? null,
       );
 
-      // Fallback para GSI se o feed CTIR falhar ou vier vazio
+      // Fallback para GSI se o feed CTIR falhar ou vier vazio.
+      // A URL atual não expõe RSS para alertas; a listagem HTML é parseada.
       if ((!result.modified && result.status !== 304) || (result.modified && result.items.length === 0)) {
         const kindPath = feed.kind === "alert" ? "alertas" : "recomendacoes";
-        const gsiUrl = `${BASE_GSI}/${kindPath}/${feed.year}/RSS`;
+        const gsiUrl = `${BASE_GSI}/${kindPath}/${feed.year}`;
         console.log(`[sync] fallback GSI ${gsiUrl}`);
         const alt = await conditionalFetch(gsiUrl, null, null);
         if (alt.modified && alt.items.length > 0) {

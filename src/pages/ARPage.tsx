@@ -249,8 +249,8 @@ export default function ARPage() {
               Análise cruzada com priorização por severidade e gap de compliance.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" className="gap-2">
-                <Zap className="h-4 w-4" /> Sincronizar com CTIR
+              <Button size="sm" className="gap-2" onClick={() => runSync(false)} disabled={syncing}>
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />} Sincronizar com CTIR
               </Button>
               <Button size="sm" variant="outline" className="gap-2" asChild>
                 <a href="https://www.gov.br/ctir/pt-br/assuntos/alertas-e-recomendacoes" target="_blank" rel="noopener noreferrer">
