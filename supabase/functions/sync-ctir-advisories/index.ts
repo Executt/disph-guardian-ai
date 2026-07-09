@@ -276,24 +276,41 @@ Deno.serve(async (req) => {
         .eq("feed_url", feed.url)
         .maybeSingle();
 
-      let result = await conditionalFetch(
-        feed.url,
-        force ? null : state?.etag ?? null,
-        force ? null : state?.last_modified ?? null,
+      let result = await withRetry<FeedResult>(
+        `fetch ${feed.url}`,
+        () => conditionalFetch(feed.url, force ? null : state?.etag ?? null, force ? null : state?.last_modified ?? null),
+        (r, err) => {
+          if (err) return true;
+          if (!r) return true;
+          if (r.status === 304) return false;
+          if (!r.modified && retryableStatus(r.status)) return true;
+          return false;
+        },
+        (attempt, reason) => logRetry(feed.url, attempt, reason),
       );
 
       // Fallback para GSI se o feed CTIR falhar ou vier vazio.
-      // A URL atual não expõe RSS para alertas; a listagem HTML é parseada.
       if ((!result.modified && result.status !== 304) || (result.modified && result.items.length === 0)) {
         const kindPath = feed.kind === "alert" ? "alertas" : "recomendacoes";
         const gsiUrl = `${BASE_GSI}/${kindPath}/${feed.year}`;
         console.log(`[sync] fallback GSI ${gsiUrl}`);
-        const alt = await conditionalFetch(gsiUrl, null, null);
+        const alt = await withRetry<FeedResult>(
+          `fallback ${gsiUrl}`,
+          () => conditionalFetch(gsiUrl, null, null),
+          (r, err) => {
+            if (err) return true;
+            if (!r) return true;
+            if (!r.modified && retryableStatus(r.status)) return true;
+            return false;
+          },
+          (attempt, reason) => logRetry(gsiUrl, attempt, reason),
+        );
         if (alt.modified && alt.items.length > 0) {
           result = alt;
-          feed.url = gsiUrl; // grava state sob a URL que efetivamente serviu
+          feed.url = gsiUrl;
         }
       }
+
 
       if (result.status === 304) {
         totals.feeds_skipped_304++;
