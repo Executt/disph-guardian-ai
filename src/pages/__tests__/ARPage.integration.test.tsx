@@ -25,8 +25,8 @@ const advisoriesFixture = [
 ];
 
 const h = vi.hoisted(() => ({
-  currentAdvisories: [] as any[],
-  invokeMock: vi.fn(),
+  h.currentAdvisories: [] as any[],
+  h.invokeMock: vi.fn(),
 }));
 
 // ---- Supabase client mock ----
@@ -84,8 +84,8 @@ function renderPage() {
 
 describe("ARPage integration (autenticado)", () => {
   beforeEach(() => {
-    currentAdvisories = advisoriesFixture;
-    invokeMock.mockClear();
+    h.currentAdvisories = advisoriesFixture;
+    h.invokeMock.mockClear();
   });
 
   it("persiste e exibe advisories do Supabase", async () => {
@@ -100,12 +100,12 @@ describe("ARPage integration (autenticado)", () => {
     const btn = await screen.findByRole("button", { name: /Sincronizar com CTIR/i });
     fireEvent.click(btn);
     await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("sync-ctir-advisories", expect.any(Object));
+      expect(h.invokeMock).toHaveBeenCalledWith("sync-ctir-advisories", expect.any(Object));
     });
   });
 
   it("exibe estado adequado quando não há advisories", async () => {
-    currentAdvisories = [];
+    h.currentAdvisories = [];
     renderPage();
     await waitFor(() => {
       expect(screen.queryByText(/OpenSSH/i)).not.toBeInTheDocument();
@@ -114,7 +114,7 @@ describe("ARPage integration (autenticado)", () => {
 
   it("exibe toast em falha de invoke", async () => {
     const { toast } = await import("@/hooks/use-toast");
-    invokeMock.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    h.invokeMock.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
     renderPage();
     const btn = await screen.findByRole("button", { name: /Sincronizar com CTIR/i });
     fireEvent.click(btn);
