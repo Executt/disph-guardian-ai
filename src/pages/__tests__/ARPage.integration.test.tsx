@@ -24,8 +24,10 @@ const advisoriesFixture = [
   },
 ];
 
-let currentAdvisories: any[] = advisoriesFixture;
-const invokeMock = vi.fn().mockResolvedValue({ data: { inserted: 1, updated: 0, skipped: 0 }, error: null });
+const h = vi.hoisted(() => ({
+  currentAdvisories: [] as any[],
+  invokeMock: vi.fn(),
+}));
 
 // ---- Supabase client mock ----
 vi.mock("@/integrations/supabase/client", () => {
@@ -42,13 +44,13 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (table: string) => {
-        if (table === "ctir_advisories") return chain(currentAdvisories);
+        if (table === "ctir_advisories") return chain(h.currentAdvisories);
         if (table === "monitored_environments") return chain([{ id: "env-1", name: "Prod", total_assets: 10 }]);
         if (table === "advisory_environment_assessments") return chain([]);
         if (table === "ctir_sync_state") return chain([]);
         return chain([]);
       },
-      functions: { invoke: invokeMock },
+      functions: { invoke: h.invokeMock },
       channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),
       removeChannel: () => {},
     },
