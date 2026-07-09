@@ -1,50 +1,50 @@
-# Plano — Observabilidade de Sync, Watchlist NVD, Detalhes CVE e Alertas
+## Objetivo
+Garantir persistência confiável dos alertas CTIR com execução automática diária, observabilidade completa das execuções, resiliência a falhas transitórias e cobertura por testes de integração autenticados.
 
-## 1. Status de sincronização (CTIR + NVD)
-- Novo componente `SyncStatusPanel` reutilizável (props: `source: 'ctir' | 'nvd'`).
-- Fonte de dados: view SQL `sync_health_v` sobre `ctir_sync_state` + `audit_logs` (`action in ('sync_ctir_advisories','sync_nvd_vulnerabilities')`) — retorna: última execução, duração, itens vistos/inseridos/atualizados, erros, feeds em 304 vs 200, feed em fallback.
-- Exibir em `/security-overview` (CTIR) e `/vulnerabilities` (NVD) no topo: badge verde/amarelo/vermelho + timestamp relativo + botão "Sincronizar agora" (invoca a edge function).
+## Escopo
 
-## 2. CRUD de `nvd_watchlist`
-- Nova aba em `/vulnerabilities` → **Watchlist** (tab "Vulnerabilidades" | "Watchlist" | "Sincronização").
-- Tabela com: label, kind (`keyword|cpe|vendor|product`), value, severity_floor, enabled, updated_at.
-- Diálogo criar/editar com validação client-side + server-side:
-  - Duplicidade: unique index `(kind, lower(value))` via migration.
-  - Formato CPE: regex `^cpe:2\.3:[aho]:` para `kind='cpe'`.
-- Toggle enable/disable inline; deleção com confirm.
-- Após salvar, invalida `ctir_sync_state` do watch (`feed_url = 'nvd:{id}'`) para forçar re-scan completo na próxima execução do cron.
+### 1. Cron diário CTIR (banco)
+- Habilitar `pg_cron` e `pg_net` (idempotente).
+- `cron.schedule('sync-ctir-daily', '0 6 * * *', ...)` invocando `sync-ctir-advisories` via `net.http_post` com header `apikey` (anon) — SQL emitido via `supabase--insert` (dados do projeto, não migração).
+- Registrar cada execução em `audit_logs` (já ocorre) + novo campo `trigger_source` no payload (`cron` | `manual`).
 
-## 3. Detalhes de CVE
-- Nova rota `/vulnerabilities/:cveId` → `CveDetailPage`.
-- Seções: cabeçalho (severidade, CVSS score/vector com breakdown AV/AC/PR/UI/S/C/I/A), sumário, CWE, watches que casaram, CPEs afetados (colapsável), referências (lista com favicon), histórico (nova tabela `nvd_vulnerability_history` populada por trigger `AFTER UPDATE` em `nvd_vulnerabilities` quando `cvss_score`, `severity`, `last_modified` ou `summary` mudam).
-- Botão "Abrir no NVD" (https://nvd.nist.gov/vuln/detail/{id}).
+### 2. Retry com backoff (`sync-ctir-advisories`)
+- Envolver `conditionalFetch` em helper `withRetry(fn, {attempts:3, baseMs:800})`: retentar em `5xx`, `429`, network errors e falhas de parse (0 items + status 200 quando esperado XML).
+- Backoff exponencial + jitter. Registrar cada tentativa falha em `sync_alerts` com `kind='retry'`, `severity='warning'` e `details.attempt`.
+- Motivo final da falha gravado em `ctir_sync_state.last_status` + `sync_alerts` com `details.reason`.
 
-## 4. Alertas de falha de sync
-- Nova edge function `notify-sync-failure` que aceita `{source, kind, details}` e:
-  - Grava em `sync_alerts` (nova tabela: source, kind, message, details jsonb, resolved_at, ticket_ref).
-  - Envia para Teams via connector `microsoft_teams` (se conectado) e WhatsApp via connector GatewayAPI/Meta (se conectado) — degrada graciosamente se não houver connector.
-  - Cria ticket via `create-itsm-ticket` (novo) que suporta GLPI (REST) e Jira (REST v3), com secrets `GLPI_URL/GLPI_APP_TOKEN/GLPI_USER_TOKEN` e `JIRA_URL/JIRA_EMAIL/JIRA_API_TOKEN/JIRA_PROJECT_KEY` (solicitados sob demanda quando o usuário ativar).
-- Gatilhos dentro de `sync-ctir-advisories` e `sync-nvd-vulnerabilities`:
-  - Feed vazio inesperado (≥3 execuções sem itens novos) → severity `warning`.
-  - Timeout (>25s por feed) ou HTTP 5xx repetido → `error`.
-  - Rate limit NVD (HTTP 403/429) → `warning`.
-  - Erro fatal → `critical`.
-- Nova aba **Sincronização** em `/vulnerabilities` mostra últimos alertas + botão "Resolver".
+### 3. Página de auditoria `/security-overview/ctir-audit`
+- Nova rota `CtirSyncAuditPage.tsx`:
+  - Card resumo: total execuções (30d), sucesso/falha, MTTR.
+  - Gráfico de barras (recharts): contagem de `sync_alerts` por dia (últimos 30d), agrupado por severity.
+  - Tabela paginada: `audit_logs` filtrado por `action='sync_ctir_advisories'` com expand mostrando `details` (feeds, inserted, updated, errors, duration, retries).
+  - Painel lateral: últimos 20 `sync_alerts` do CTIR com filtro por severity e status resolvido.
+- Link a partir do `SyncStatusPanel` (botão "Ver auditoria").
 
-## 5. Banco (migração única)
-- Tabelas: `nvd_vulnerability_history`, `sync_alerts`.
-- Unique index `nvd_watchlist_unique_kind_value`.
-- View `sync_health_v`.
-- Trigger `nvd_vuln_history_tg`.
-- GRANTs + RLS (leitura authenticated, mutação apenas admin/operator; service_role total).
+### 4. Testes de integração (`src/pages/__tests__/ARPage.integration.test.tsx`)
+- Mock do cliente Supabase (`vi.mock('@/integrations/supabase/client')`) retornando fixture de `ctir_advisories` + sessão autenticada mockada via `AuthContext`.
+- Casos:
+  1. Renderiza lista com ≥1 advisory após load.
+  2. Botão "Sincronizar" chama `functions.invoke('sync-ctir-advisories')` e atualiza estado de loading.
+  3. Estado vazio exibe placeholder quando fixture retorna `[]`.
+  4. Falha do invoke exibe toast de erro.
+- Rodar via `bunx vitest run`.
 
-## Ordem de execução
-1. Migração (tabelas, view, trigger, unique index).
-2. Edge functions: `notify-sync-failure`, `create-itsm-ticket`; instrumentar `sync-ctir-advisories` e `sync-nvd-vulnerabilities`.
-3. Frontend: `SyncStatusPanel`, tabs em `/vulnerabilities`, `WatchlistManager`, `CveDetailPage`, rota nova.
-4. Documentação em `docs/09-regras-de-negocio.md` (thresholds de alerta).
+## Estrutura técnica
+```text
+supabase/functions/sync-ctir-advisories/index.ts   [edit: withRetry + retry alerts]
+src/pages/CtirSyncAuditPage.tsx                    [new]
+src/App.tsx                                        [route]
+src/components/SyncStatusPanel.tsx                 [link auditoria]
+src/pages/__tests__/ARPage.integration.test.tsx    [new]
++ supabase--insert: cron.schedule + extensions
+```
+
+## Fora de escopo
+- Alterar schema (usa tabelas existentes: `audit_logs`, `sync_alerts`, `ctir_sync_state`).
+- Cron do NVD (só CTIR nesta iteração).
+- E2E Playwright (integração via Vitest + mocks).
 
 ## Perguntas
-1. ITSM: **GLPI**, **Jira**, ou ambos? (afeta quais secrets pedirei depois)
-2. WhatsApp: usar connector **GatewayAPI** (já mencionado no contexto) ou Meta Cloud API direta?
-3. Thresholds de "vazio inesperado" — mantenho 3 execuções consecutivas sem novos itens ou prefere outro valor?
+1. Horário do cron: **06:00 UTC** (03:00 BRT) OK, ou prefere outro?
+2. Retentativas: **3 tentativas / base 800ms** OK?

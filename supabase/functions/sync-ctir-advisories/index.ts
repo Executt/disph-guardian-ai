@@ -173,6 +173,38 @@ async function conditionalFetch(
   };
 }
 
+// Retry com backoff exponencial + jitter
+async function withRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  shouldRetry: (result: T | null, err: unknown) => boolean,
+  onAttemptFail: (attempt: number, reason: string) => Promise<void>,
+  attempts = 3,
+  baseMs = 800,
+): Promise<T> {
+  let lastErr: unknown = null;
+  let lastRes: T | null = null;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      lastRes = await fn();
+      if (!shouldRetry(lastRes, null)) return lastRes;
+      await onAttemptFail(i, `retryable_result`);
+    } catch (e) {
+      lastErr = e;
+      await onAttemptFail(i, (e as Error)?.message ?? String(e));
+      if (!shouldRetry(null, e)) break;
+    }
+    if (i < attempts) {
+      const delay = baseMs * Math.pow(2, i - 1) + Math.floor(Math.random() * 250);
+      console.log(`[retry] ${label} attempt ${i} failed, waiting ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  if (lastRes !== null) return lastRes;
+  throw lastErr ?? new Error(`${label} failed after ${attempts} attempts`);
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -211,8 +243,29 @@ Deno.serve(async (req) => {
 
   const totals = {
     feeds_checked: 0, feeds_changed: 0, feeds_skipped_304: 0,
-    inserted: 0, updated: 0, unchanged: 0, assessments_created: 0, errors: 0,
+    inserted: 0, updated: 0, unchanged: 0, assessments_created: 0, errors: 0, retries: 0,
   };
+
+  // Parse trigger_source
+  let trigger_source: "cron" | "manual" = "manual";
+  try {
+    if (req.method === "POST") {
+      const bodyClone = req.clone();
+      const b = await bodyClone.json().catch(() => ({} as any));
+      if (b?.trigger_source === "cron") trigger_source = "cron";
+    }
+  } catch { /* noop */ }
+
+  const retryableStatus = (s: number) => s === 0 || s === 408 || s === 429 || (s >= 500 && s < 600);
+  const logRetry = async (feedUrl: string, attempt: number, reason: string) => {
+    totals.retries++;
+    await supabase.from("sync_alerts" as any).insert({
+      source: "ctir", kind: "retry", severity: "warning",
+      message: `Tentativa ${attempt} falhou em ${feedUrl}`,
+      details: { feed_url: feedUrl, attempt, reason },
+    }).then(() => {}, () => {});
+  };
+
 
   for (const feed of feeds) {
     totals.feeds_checked++;
@@ -223,24 +276,41 @@ Deno.serve(async (req) => {
         .eq("feed_url", feed.url)
         .maybeSingle();
 
-      let result = await conditionalFetch(
-        feed.url,
-        force ? null : state?.etag ?? null,
-        force ? null : state?.last_modified ?? null,
+      let result = await withRetry<FeedResult>(
+        `fetch ${feed.url}`,
+        () => conditionalFetch(feed.url, force ? null : state?.etag ?? null, force ? null : state?.last_modified ?? null),
+        (r, err) => {
+          if (err) return true;
+          if (!r) return true;
+          if (r.status === 304) return false;
+          if (!r.modified && retryableStatus(r.status)) return true;
+          return false;
+        },
+        (attempt, reason) => logRetry(feed.url, attempt, reason),
       );
 
       // Fallback para GSI se o feed CTIR falhar ou vier vazio.
-      // A URL atual não expõe RSS para alertas; a listagem HTML é parseada.
       if ((!result.modified && result.status !== 304) || (result.modified && result.items.length === 0)) {
         const kindPath = feed.kind === "alert" ? "alertas" : "recomendacoes";
         const gsiUrl = `${BASE_GSI}/${kindPath}/${feed.year}`;
         console.log(`[sync] fallback GSI ${gsiUrl}`);
-        const alt = await conditionalFetch(gsiUrl, null, null);
+        const alt = await withRetry<FeedResult>(
+          `fallback ${gsiUrl}`,
+          () => conditionalFetch(gsiUrl, null, null),
+          (r, err) => {
+            if (err) return true;
+            if (!r) return true;
+            if (!r.modified && retryableStatus(r.status)) return true;
+            return false;
+          },
+          (attempt, reason) => logRetry(gsiUrl, attempt, reason),
+        );
         if (alt.modified && alt.items.length > 0) {
           result = alt;
-          feed.url = gsiUrl; // grava state sob a URL que efetivamente serviu
+          feed.url = gsiUrl;
         }
       }
+
 
       if (result.status === 304) {
         totals.feeds_skipped_304++;
@@ -336,15 +406,22 @@ Deno.serve(async (req) => {
       }, { onConflict: "feed_url" });
     } catch (e) {
       totals.errors++;
+      const reason = (e as Error)?.message ?? String(e);
       console.error(`[sync] feed ${feed.url} error`, e);
+      await supabase.from("sync_alerts" as any).insert({
+        source: "ctir", kind: "feed_error", severity: "error",
+        message: `Falha ao processar ${feed.url}: ${reason}`,
+        details: { feed_url: feed.url, reason },
+      }).then(() => {}, () => {});
     }
   }
 
   await supabase.from("audit_logs").insert({
     action: "sync_ctir_advisories",
     resource_type: "ctir_advisories",
-    details: { ...totals, force, years_back: yearsBack, duration_ms: Date.now() - startedAt },
+    details: { ...totals, force, years_back: yearsBack, trigger_source, duration_ms: Date.now() - startedAt },
   });
+
 
   // Alertas de inconsistência
   try {

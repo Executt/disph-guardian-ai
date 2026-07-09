@@ -120,6 +120,11 @@ export default function SyncStatusPanel({ source, functionName }: Props) {
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${syncing ? "animate-spin" : ""}`} />
             Sincronizar agora
           </Button>
+          {source === "ctir" && (
+            <Button size="sm" variant="ghost" asChild>
+              <a href="/security-overview/ctir-audit">Ver auditoria</a>
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
