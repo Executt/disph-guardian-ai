@@ -173,6 +173,38 @@ async function conditionalFetch(
   };
 }
 
+// Retry com backoff exponencial + jitter
+async function withRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  shouldRetry: (result: T | null, err: unknown) => boolean,
+  onAttemptFail: (attempt: number, reason: string) => Promise<void>,
+  attempts = 3,
+  baseMs = 800,
+): Promise<T> {
+  let lastErr: unknown = null;
+  let lastRes: T | null = null;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      lastRes = await fn();
+      if (!shouldRetry(lastRes, null)) return lastRes;
+      await onAttemptFail(i, `retryable_result`);
+    } catch (e) {
+      lastErr = e;
+      await onAttemptFail(i, (e as Error)?.message ?? String(e));
+      if (!shouldRetry(null, e)) break;
+    }
+    if (i < attempts) {
+      const delay = baseMs * Math.pow(2, i - 1) + Math.floor(Math.random() * 250);
+      console.log(`[retry] ${label} attempt ${i} failed, waiting ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  if (lastRes !== null) return lastRes;
+  throw lastErr ?? new Error(`${label} failed after ${attempts} attempts`);
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
