@@ -25,8 +25,8 @@ const advisoriesFixture = [
 ];
 
 const h = vi.hoisted(() => ({
-  h.currentAdvisories: [] as any[],
-  h.invokeMock: vi.fn(),
+  currentAdvisories: [] as any[],
+  invokeMock: vi.fn(),
 }));
 
 // ---- Supabase client mock ----
