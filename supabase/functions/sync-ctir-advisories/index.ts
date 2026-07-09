@@ -243,8 +243,29 @@ Deno.serve(async (req) => {
 
   const totals = {
     feeds_checked: 0, feeds_changed: 0, feeds_skipped_304: 0,
-    inserted: 0, updated: 0, unchanged: 0, assessments_created: 0, errors: 0,
+    inserted: 0, updated: 0, unchanged: 0, assessments_created: 0, errors: 0, retries: 0,
   };
+
+  // Parse trigger_source
+  let trigger_source: "cron" | "manual" = "manual";
+  try {
+    if (req.method === "POST") {
+      const bodyClone = req.clone();
+      const b = await bodyClone.json().catch(() => ({} as any));
+      if (b?.trigger_source === "cron") trigger_source = "cron";
+    }
+  } catch { /* noop */ }
+
+  const retryableStatus = (s: number) => s === 0 || s === 408 || s === 429 || (s >= 500 && s < 600);
+  const logRetry = async (feedUrl: string, attempt: number, reason: string) => {
+    totals.retries++;
+    await supabase.from("sync_alerts" as any).insert({
+      source: "ctir", kind: "retry", severity: "warning",
+      message: `Tentativa ${attempt} falhou em ${feedUrl}`,
+      details: { feed_url: feedUrl, attempt, reason },
+    }).then(() => {}, () => {});
+  };
+
 
   for (const feed of feeds) {
     totals.feeds_checked++;
