@@ -406,15 +406,22 @@ Deno.serve(async (req) => {
       }, { onConflict: "feed_url" });
     } catch (e) {
       totals.errors++;
+      const reason = (e as Error)?.message ?? String(e);
       console.error(`[sync] feed ${feed.url} error`, e);
+      await supabase.from("sync_alerts" as any).insert({
+        source: "ctir", kind: "feed_error", severity: "error",
+        message: `Falha ao processar ${feed.url}: ${reason}`,
+        details: { feed_url: feed.url, reason },
+      }).then(() => {}, () => {});
     }
   }
 
   await supabase.from("audit_logs").insert({
     action: "sync_ctir_advisories",
     resource_type: "ctir_advisories",
-    details: { ...totals, force, years_back: yearsBack, duration_ms: Date.now() - startedAt },
+    details: { ...totals, force, years_back: yearsBack, trigger_source, duration_ms: Date.now() - startedAt },
   });
+
 
   // Alertas de inconsistência
   try {
