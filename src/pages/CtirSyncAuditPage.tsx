@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
 } from "recharts";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { toast } from "sonner";
+import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play } from "lucide-react";
 
 type AuditRow = {
   id: string;
@@ -30,29 +33,51 @@ type Alert = {
   resolved_at: string | null;
 };
 
+const PAGE_SIZE = 20;
+const MONTHS = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
 export default function CtirSyncAuditPage() {
   const [audits, setAudits] = useState<AuditRow[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // filtros
   const [severityFilter, setSeverityFilter] = useState<string>("all");
+  const [kindFilter, setKindFilter] = useState<string>("all");
+  const [year, setYear] = useState<string>("all");
+  const [month, setMonth] = useState<string>("all");
+
+  // paginação
+  const [runsPage, setRunsPage] = useState(0);
+  const [alertsPage, setAlertsPage] = useState(0);
+
+  // execução em tempo real
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [liveEvents, setLiveEvents] = useState<Alert[]>([]);
+  const [lastResult, setLastResult] = useState<any>(null);
+  const runStartRef = useRef<number>(0);
 
   const load = async () => {
     setLoading(true);
-    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const since = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
     const [a, al] = await Promise.all([
       supabase.from("audit_logs")
         .select("id,created_at,action,details")
         .eq("action", "sync_ctir_advisories")
         .gte("created_at", since)
         .order("created_at", { ascending: false })
-        .limit(200),
+        .limit(500),
       supabase.from("sync_alerts" as any)
         .select("id,source,kind,severity,message,details,created_at,resolved_at")
         .eq("source", "ctir")
         .gte("created_at", since)
         .order("created_at", { ascending: false })
-        .limit(200),
+        .limit(500),
     ]);
     setAudits((a.data as AuditRow[]) ?? []);
     setAlerts(((al.data as unknown) as Alert[]) ?? []);
@@ -61,28 +86,114 @@ export default function CtirSyncAuditPage() {
 
   useEffect(() => { load(); }, []);
 
-  const summary = useMemo(() => {
-    const total = audits.length;
-    const withErrors = audits.filter(a => (a.details?.errors ?? 0) > 0).length;
-    const success = total - withErrors;
-    const totalInserted = audits.reduce((s, a) => s + (a.details?.inserted ?? 0), 0);
-    const totalRetries = audits.reduce((s, a) => s + (a.details?.retries ?? 0), 0);
-    return { total, success, withErrors, totalInserted, totalRetries };
-  }, [audits]);
+  // cronômetro da execução
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setElapsed(Date.now() - runStartRef.current), 250);
+    return () => clearInterval(t);
+  }, [running]);
 
-  const chartData = useMemo(() => {
-    const buckets: Record<string, { date: string; warning: number; error: number; critical: number }> = {};
-    for (const a of alerts) {
-      const d = format(new Date(a.created_at), "dd/MM");
-      const b = buckets[d] ?? { date: d, warning: 0, error: 0, critical: 0 };
-      const sev = a.severity as "warning" | "error" | "critical";
-      if (sev in b) (b as any)[sev]++;
-      buckets[d] = b;
+  // eventos em tempo real durante a execução
+  useEffect(() => {
+    const ch = supabase
+      .channel("ctir-audit-live")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "sync_alerts" },
+        (payload: any) => {
+          const row = payload.new as Alert;
+          if (row?.source !== "ctir") return;
+          setLiveEvents(prev => [row, ...prev].slice(0, 30));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  const runNow = async () => {
+    setRunning(true);
+    setLiveEvents([]);
+    setLastResult(null);
+    runStartRef.current = Date.now();
+    setElapsed(0);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-ctir-advisories", {
+        body: { trigger_source: "manual" },
+      });
+      if (error) throw error;
+      setLastResult(data);
+      toast.success("Sincronização CTIR concluída", {
+        description: `Inseridos: ${data?.inserted ?? 0} · Atualizados: ${data?.updated ?? 0} · Erros: ${data?.errors ?? 0}`,
+      });
+      await load();
+    } catch (e: any) {
+      toast.error(`Falha ao executar sync CTIR: ${e?.message ?? e}`);
+    } finally {
+      setRunning(false);
     }
-    return Object.values(buckets).reverse().slice(-30);
+  };
+
+  // ---- filtragem compartilhada por período ----
+  const inPeriod = (iso: string) => {
+    const d = new Date(iso);
+    if (year !== "all" && d.getFullYear() !== Number(year)) return false;
+    if (month !== "all" && d.getMonth() !== Number(month)) return false;
+    return true;
+  };
+
+  const years = useMemo(() => {
+    const s = new Set<number>();
+    [...audits, ...alerts].forEach(r => s.add(new Date(r.created_at).getFullYear()));
+    return Array.from(s).sort((a, b) => b - a);
+  }, [audits, alerts]);
+
+  const kinds = useMemo(() => {
+    const s = new Set<string>();
+    alerts.forEach(a => s.add(a.kind));
+    return Array.from(s).sort();
   }, [alerts]);
 
-  const filteredAlerts = alerts.filter(a => severityFilter === "all" || a.severity === severityFilter);
+  const filteredAudits = useMemo(
+    () => audits.filter(a => inPeriod(a.created_at)),
+    [audits, year, month],
+  );
+
+  const filteredAlerts = useMemo(
+    () => alerts.filter(a =>
+      inPeriod(a.created_at) &&
+      (severityFilter === "all" || a.severity === severityFilter) &&
+      (kindFilter === "all" || a.kind === kindFilter)),
+    [alerts, year, month, severityFilter, kindFilter],
+  );
+
+  useEffect(() => { setRunsPage(0); setAlertsPage(0); }, [year, month, severityFilter, kindFilter]);
+
+  const summary = useMemo(() => {
+    const total = filteredAudits.length;
+    const withErrors = filteredAudits.filter(a => (a.details?.errors ?? 0) > 0).length;
+    const success = total - withErrors;
+    const totalInserted = filteredAudits.reduce((s, a) => s + (a.details?.inserted ?? 0), 0);
+    const totalRetries = filteredAudits.reduce((s, a) => s + (a.details?.retries ?? 0), 0);
+    return { total, success, withErrors, totalInserted, totalRetries };
+  }, [filteredAudits]);
+
+  // contagem por data consistente com os mesmos filtros aplicados
+  const chartData = useMemo(() => {
+    const buckets: Record<string, { key: number; date: string; warning: number; error: number; critical: number }> = {};
+    for (const a of filteredAlerts) {
+      const d = new Date(a.created_at);
+      const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const label = format(d, "dd/MM");
+      const b = buckets[label] ?? { key, date: label, warning: 0, error: 0, critical: 0 };
+      const sev = a.severity as "warning" | "error" | "critical";
+      if (sev in b) (b as any)[sev]++;
+      buckets[label] = b;
+    }
+    return Object.values(buckets).sort((a, b) => a.key - b.key).slice(-31);
+  }, [filteredAlerts]);
+
+  const pagedAudits = filteredAudits.slice(runsPage * PAGE_SIZE, runsPage * PAGE_SIZE + PAGE_SIZE);
+  const pagedAlerts = filteredAlerts.slice(alertsPage * PAGE_SIZE, alertsPage * PAGE_SIZE + PAGE_SIZE);
 
   const toggle = (id: string) => {
     const next = new Set(expanded);
@@ -92,15 +203,93 @@ export default function CtirSyncAuditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="heading text-2xl font-bold">Auditoria de Sincronização CTIR</h1>
-          <p className="text-sm text-muted-foreground">Últimas execuções, falhas e retentativas nos últimos 30 dias</p>
+          <p className="text-sm text-muted-foreground">Execuções, falhas e retentativas com filtros por período</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={runNow} disabled={running}>
+            <Play className={`h-4 w-4 mr-2 ${running ? "animate-pulse" : ""}`} />
+            {running ? "Executando…" : "Executar CTIR agora"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
+          </Button>
+        </div>
       </div>
+
+      {(running || lastResult) && (
+        <Card data-testid="run-progress">
+          <CardHeader className="pb-2">
+            <CardTitle className="heading text-sm flex items-center gap-2">
+              {running ? <RefreshCw className="h-4 w-4 animate-spin text-primary" /> : <CheckCircle2 className="h-4 w-4 text-accent" />}
+              {running ? "Execução em andamento" : "Última execução manual"}
+              <span className="font-mono text-[11px] text-muted-foreground">{(elapsed / 1000).toFixed(1)}s</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Progress value={running ? Math.min(95, (elapsed / 60000) * 100) : 100} />
+            {lastResult && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs font-mono">
+                {[
+                  ["Feeds", lastResult.feeds_checked], ["Inseridos", lastResult.inserted],
+                  ["Atualizados", lastResult.updated], ["Retries", lastResult.retries],
+                  ["Erros", lastResult.errors],
+                ].map(([l, v]) => (
+                  <div key={String(l)}>
+                    <div className="text-[10px] uppercase text-muted-foreground">{l}</div>
+                    <div>{v ?? 0}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {liveEvents.length === 0 ? (
+                <div className="text-[11px] font-mono text-muted-foreground">Aguardando eventos da execução…</div>
+              ) : liveEvents.map(e => (
+                <div key={e.id} className="text-[11px] font-mono flex items-center gap-2 border border-border/40 rounded px-2 py-1">
+                  <Badge variant="outline" className="text-[10px]">{e.kind}</Badge>
+                  <span className="truncate">{e.message}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="pt-4 flex flex-wrap gap-2 items-center">
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-32" aria-label="Ano"><SelectValue placeholder="Ano" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os anos</SelectItem>
+              {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="w-40" aria-label="Mês"><SelectValue placeholder="Mês" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os meses</SelectItem>
+              {MONTHS.map((m, i) => <SelectItem key={m} value={String(i)}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={severityFilter} onValueChange={setSeverityFilter}>
+            <SelectTrigger className="w-40" aria-label="Severidade"><SelectValue placeholder="Severidade" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas severidades</SelectItem>
+              {["warning", "error", "critical"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={kindFilter} onValueChange={setKindFilter}>
+            <SelectTrigger className="w-48" aria-label="Tipo de falha"><SelectValue placeholder="Tipo de falha" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              {kinds.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <SummaryCard icon={Clock} label="Execuções" value={summary.total} tone="primary" />
@@ -113,7 +302,7 @@ export default function CtirSyncAuditPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="heading text-sm">Alertas de sincronização por dia</CardTitle>
-          <CardDescription>Distribuição por severidade (30 dias)</CardDescription>
+          <CardDescription>Distribuição por severidade (filtros aplicados)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-56">
@@ -135,8 +324,8 @@ export default function CtirSyncAuditPage() {
 
       <Tabs defaultValue="runs">
         <TabsList>
-          <TabsTrigger value="runs">Execuções</TabsTrigger>
-          <TabsTrigger value="alerts">Alertas ({alerts.length})</TabsTrigger>
+          <TabsTrigger value="runs">Execuções ({filteredAudits.length})</TabsTrigger>
+          <TabsTrigger value="alerts">Alertas ({filteredAlerts.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="runs">
@@ -157,7 +346,7 @@ export default function CtirSyncAuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {audits.map(a => {
+                  {pagedAudits.map(a => {
                     const d = a.details ?? {};
                     const isOpen = expanded.has(a.id);
                     return (
@@ -192,29 +381,21 @@ export default function CtirSyncAuditPage() {
                       </>
                     );
                   })}
-                  {audits.length === 0 && !loading && (
+                  {filteredAudits.length === 0 && !loading && (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">
-                      Nenhuma execução registrada nos últimos 30 dias.
+                      Nenhuma execução registrada no período selecionado.
                     </TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
+              <Pager page={runsPage} setPage={setRunsPage} total={filteredAudits.length} />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="alerts">
           <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap gap-2">
-                {["all", "warning", "error", "critical"].map(s => (
-                  <Button key={s} size="sm" variant={severityFilter === s ? "default" : "outline"} onClick={() => setSeverityFilter(s)}>
-                    {s === "all" ? "Todos" : s}
-                  </Button>
-                ))}
-              </div>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -226,7 +407,7 @@ export default function CtirSyncAuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAlerts.map(a => (
+                  {pagedAlerts.map(a => (
                     <TableRow key={a.id}>
                       <TableCell className="font-mono text-xs">
                         {formatDistanceToNow(new Date(a.created_at), { addSuffix: true, locale: ptBR })}
@@ -254,10 +435,27 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
+              <Pager page={alertsPage} setPage={setAlertsPage} total={filteredAlerts.length} />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function Pager({ page, setPage, total }: { page: number; setPage: (n: number) => void; total: number }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  return (
+    <div className="flex items-center justify-between pt-3 text-xs font-mono">
+      <span className="text-muted-foreground">
+        {total === 0 ? "0 registros" : `${page * PAGE_SIZE + 1}–${Math.min(total, (page + 1) * PAGE_SIZE)} de ${total}`}
+      </span>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</Button>
+        <span className="self-center">{page + 1}/{pages}</span>
+        <Button size="sm" variant="outline" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>Próxima</Button>
+      </div>
     </div>
   );
 }
