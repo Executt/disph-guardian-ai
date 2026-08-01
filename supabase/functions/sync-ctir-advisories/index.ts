@@ -256,9 +256,17 @@ Deno.serve(async (req) => {
     }
   } catch { /* noop */ }
 
+  // Falhas por feed após esgotar backoff (motivo + tentativas)
+  const failures: {
+    feed_url: string; kind: string; year: number;
+    status?: number; reason: string; attempts: number;
+  }[] = [];
+  const attemptsByFeed: Record<string, number> = {};
+
   const retryableStatus = (s: number) => s === 0 || s === 408 || s === 429 || (s >= 500 && s < 600);
   const logRetry = async (feedUrl: string, attempt: number, reason: string) => {
     totals.retries++;
+    attemptsByFeed[feedUrl] = attempt;
     await supabase.from("sync_alerts" as any).insert({
       source: "ctir", kind: "retry", severity: "warning",
       message: `Tentativa ${attempt} falhou em ${feedUrl}`,
@@ -326,6 +334,14 @@ Deno.serve(async (req) => {
 
       if (!result.modified) {
         totals.errors++;
+        const reason = retryableStatus(result.status)
+          ? `HTTP ${result.status} após esgotar retentativas`
+          : `HTTP ${result.status}`;
+        failures.push({
+          feed_url: feed.url, kind: feed.kind, year: feed.year,
+          status: result.status, reason,
+          attempts: attemptsByFeed[feed.url] ?? 1,
+        });
         console.warn(`[sync] feed ${feed.url} status=${result.status}`);
         continue;
       }
@@ -408,6 +424,10 @@ Deno.serve(async (req) => {
       totals.errors++;
       const reason = (e as Error)?.message ?? String(e);
       console.error(`[sync] feed ${feed.url} error`, e);
+      failures.push({
+        feed_url: feed.url, kind: feed.kind, year: feed.year,
+        reason, attempts: attemptsByFeed[feed.url] ?? 1,
+      });
       await supabase.from("sync_alerts" as any).insert({
         source: "ctir", kind: "feed_error", severity: "error",
         message: `Falha ao processar ${feed.url}: ${reason}`,
@@ -419,18 +439,32 @@ Deno.serve(async (req) => {
   await supabase.from("audit_logs").insert({
     action: "sync_ctir_advisories",
     resource_type: "ctir_advisories",
-    details: { ...totals, force, years_back: yearsBack, trigger_source, duration_ms: Date.now() - startedAt },
+    details: {
+      ...totals, force, years_back: yearsBack, trigger_source,
+      duration_ms: Date.now() - startedAt,
+      failures,
+    },
   });
 
 
   // Alertas de inconsistência
   try {
     if (totals.errors > 0) {
+      const top = failures.slice(0, 5)
+        .map(f => `• ${f.kind}/${f.year} — ${f.reason} (tentativas: ${f.attempts})\n  ${f.feed_url}`)
+        .join("\n");
       await supabase.functions.invoke("notify-sync-failure", {
         body: {
-          source: "ctir", kind: "http_error", severity: "error",
-          message: `${totals.errors} feed(s) do CTIR falharam`,
-          details: totals,
+          source: "ctir",
+          kind: failures.some(f => f.status === 429) ? "rate_limit"
+            : failures.some(f => /timeout|abort/i.test(f.reason)) ? "timeout"
+            : "http_error",
+          severity: totals.feeds_changed === 0 ? "critical" : "error",
+          message:
+            `Sincronização CTIR falhou em ${totals.errors} feed(s) após retentativas com backoff ` +
+            `(origem: ${trigger_source}, retries: ${totals.retries}).\n${top}`,
+          details: { ...totals, trigger_source, force, failures, duration_ms: Date.now() - startedAt },
+          create_ticket: true,
         },
       });
     } else if (totals.feeds_changed > 0 && totals.inserted === 0 && totals.updated === 0) {
@@ -438,7 +472,7 @@ Deno.serve(async (req) => {
         body: {
           source: "ctir", kind: "empty_feed", severity: "warning",
           message: "Feeds retornaram conteúdo mas sem novos itens/alterações",
-          details: totals,
+          details: { ...totals, trigger_source },
         },
       });
     }
