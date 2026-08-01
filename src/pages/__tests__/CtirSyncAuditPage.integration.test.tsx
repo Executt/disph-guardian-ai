@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
 
 (globalThis as any).ResizeObserver = class {
   observe() {} unobserve() {} disconnect() {}
@@ -107,7 +108,7 @@ describe("CtirSyncAuditPage (sessão autenticada)", () => {
   it("renderiza a aba de alertas com tipo e severidade", async () => {
     renderPage();
     const tab = await screen.findByRole("tab", { name: /Alertas \(2\)/ });
-    fireEvent.click(tab);
+    await userEvent.click(tab);
     await waitFor(() => {
       expect(screen.getByText("feed_error")).toBeInTheDocument();
     });
