@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
+(globalThis as any).ResizeObserver = class {
+  observe() {} unobserve() {} disconnect() {}
+};
+
 const now = new Date().toISOString();
 
 const auditFixture = [
