@@ -66,6 +66,10 @@ async function createTicket(title: string, description: string): Promise<string 
   } catch { return null; }
 }
 
+// Janela de deduplicação por (source, kind) e limite global por origem.
+const DEDUP_WINDOW_MIN = Number(Deno.env.get("SYNC_ALERT_DEDUP_MINUTES") ?? "30");
+const RATE_LIMIT_PER_HOUR = Number(Deno.env.get("SYNC_ALERT_MAX_PER_HOUR") ?? "5");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return new Response("method not allowed", { status: 405, headers: cors });
@@ -80,21 +84,67 @@ Deno.serve(async (req) => {
   }
   const severity = p.severity ?? (p.kind === "fatal" ? "critical" : p.kind === "http_error" || p.kind === "timeout" ? "error" : "warning");
 
-  const text = `⚠️ [${p.source.toUpperCase()} · ${p.kind}] ${p.message}`;
-  const [teamsOk, waOk] = await Promise.all([notifyTeams(text), notifyWhatsApp(text)]);
-  const notified: string[] = [];
-  if (teamsOk) notified.push("teams");
-  if (waOk) notified.push("whatsapp");
+  // ── Deduplicação: mesma origem+tipo já notificada na janela? ──────
+  const dedupSince = new Date(Date.now() - DEDUP_WINDOW_MIN * 60_000).toISOString();
+  const { data: dupes } = await supabase
+    .from("sync_alerts")
+    .select("id,created_at,notified_channels,details")
+    .eq("source", p.source)
+    .eq("kind", p.kind)
+    .is("resolved_at", null)
+    .gte("created_at", dedupSince)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
+  const notifiedDupes = (dupes ?? []).filter(
+    (d: any) => Array.isArray(d.notified_channels) && d.notified_channels.length > 0,
+  );
+  const duplicate = notifiedDupes.length > 0;
+
+  // ── Rate limit: máximo de notificações por hora por origem ────────
+  const hourSince = new Date(Date.now() - 3_600_000).toISOString();
+  const { data: recent } = await supabase
+    .from("sync_alerts")
+    .select("id,notified_channels")
+    .eq("source", p.source)
+    .gte("created_at", hourSince)
+    .limit(200);
+  const sentLastHour = (recent ?? []).filter(
+    (r: any) => Array.isArray(r.notified_channels) && r.notified_channels.some((c: string) => c === "teams" || c === "whatsapp"),
+  ).length;
+  const rateLimited = sentLastHour >= RATE_LIMIT_PER_HOUR;
+
+  const suppressed = duplicate || rateLimited;
+  const suppression_reason = rateLimited
+    ? `rate_limit:${sentLastHour}/${RATE_LIMIT_PER_HOUR}h`
+    : duplicate ? `dedup:${DEDUP_WINDOW_MIN}min` : null;
+  const occurrences = (dupes ?? []).length + 1;
+
+  const text =
+    `⚠️ [${p.source.toUpperCase()} · ${p.kind}] ${p.message}` +
+    (occurrences > 1 ? `\n(ocorrência #${occurrences} na janela de ${DEDUP_WINDOW_MIN}min)` : "");
+
+  const notified: string[] = [];
+  if (!suppressed) {
+    const [teamsOk, waOk] = await Promise.all([notifyTeams(text), notifyWhatsApp(text)]);
+    if (teamsOk) notified.push("teams");
+    if (waOk) notified.push("whatsapp");
+  }
+
+  // Ticket também é deduplicado: só abre se ainda não houver ticket na janela
   let ticketRef: string | null = null;
-  if (p.create_ticket !== false && (severity === "error" || severity === "critical")) {
+  const hasTicket = (dupes ?? []).some((d: any) => d.details?.ticket_ref || d.ticket_ref);
+  if (!suppressed && !hasTicket && p.create_ticket !== false && (severity === "error" || severity === "critical")) {
     ticketRef = await createTicket(`Sync ${p.source} · ${p.kind}`, `${p.message}\n\n${JSON.stringify(p.details ?? {}, null, 2)}`);
     if (ticketRef) notified.push(`ticket:${ticketRef}`);
   }
 
+  // O registro é sempre persistido (motivo/detalhes preservados), mesmo suprimido.
   const { data, error } = await supabase.from("sync_alerts").insert({
     source: p.source, kind: p.kind, severity, message: p.message,
-    details: p.details ?? {}, ticket_ref: ticketRef, notified_channels: notified,
+    details: { ...(p.details ?? {}), occurrences, suppressed, suppression_reason },
+    ticket_ref: ticketRef,
+    notified_channels: suppressed ? [`suppressed:${suppression_reason}`] : notified,
   }).select("id").single();
 
   if (error) {
@@ -102,7 +152,11 @@ Deno.serve(async (req) => {
       status: 500, headers: { ...cors, "Content-Type": "application/json" },
     });
   }
-  return new Response(JSON.stringify({ ok: true, id: data.id, notified, ticket_ref: ticketRef }), {
+  return new Response(JSON.stringify({
+    ok: true, id: data.id, notified, ticket_ref: ticketRef,
+    suppressed, suppression_reason, occurrences,
+  }), {
     headers: { ...cors, "Content-Type": "application/json" },
   });
 });
+
