@@ -224,6 +224,9 @@ export default function CtirSyncAuditPage() {
     const meta = { ...exportMetaBase, tab } as const;
     fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
     toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+  };
+
+
 
 
   return (
