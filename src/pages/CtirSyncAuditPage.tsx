@@ -193,6 +193,39 @@ export default function CtirSyncAuditPage() {
     setExpanded(next);
   };
 
+  const exportMetaBase = { year, month, severity: severityFilter, kind: kindFilter, scope: exportScope };
+
+  const runsExport = () => ({
+    headers: ["Data", "Origem", "Feeds", "Inseridos", "Atualizados", "Retries", "Erros", "Duração (ms)", "Falhas"],
+    rows: (exportScope === "page" ? pagedAudits : filteredAudits).map(a => {
+      const d = a.details ?? {};
+      return [
+        format(new Date(a.created_at), "dd/MM/yyyy HH:mm"),
+        d.trigger_source ?? "manual",
+        d.feeds_checked ?? 0, d.inserted ?? 0, d.updated ?? 0,
+        d.retries ?? 0, d.errors ?? 0, d.duration_ms ?? 0,
+        (d.failures ?? []).map((f: any) => `${f.kind ?? ""}/${f.year ?? ""}: ${f.reason ?? ""}`).join(" | "),
+      ];
+    }),
+  });
+
+  const alertsExport = () => ({
+    headers: ["Data", "Tipo", "Severidade", "Mensagem", "Status"],
+    rows: (exportScope === "page" ? pagedAlerts : filteredAlerts).map(a => [
+      format(new Date(a.created_at), "dd/MM/yyyy HH:mm"),
+      a.kind, a.severity, a.message, a.resolved_at ? "resolvido" : "aberto",
+    ]),
+  });
+
+  const doExport = (fmt: "csv" | "pdf") => {
+    const tab = activeTab === "alerts" ? "alerts" : "runs";
+    const { headers, rows } = tab === "alerts" ? alertsExport() : runsExport();
+    if (rows.length === 0) return toast.error("Nada para exportar com os filtros atuais");
+    const meta = { ...exportMetaBase, tab } as const;
+    fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
+    toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
