@@ -62,9 +62,13 @@ export default function CtirSyncAuditPage() {
   // execução em tempo real
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [liveEvents, setLiveEvents] = useState<Alert[]>([]);
   const [lastResult, setLastResult] = useState<any>(null);
   const runStartRef = useRef<number>(0);
+  const [exportScope, setExportScope] = useState<ExportScope>("all");
+
+  // stream de progresso (WebSocket + fallback polling + reconexão)
+  const { events: liveEvents, transport, reconnects, reset: resetProgress } = useSyncProgress("ctir");
+
 
   const load = async () => {
     setLoading(true);
