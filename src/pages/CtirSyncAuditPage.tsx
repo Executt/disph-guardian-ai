@@ -101,26 +101,10 @@ export default function CtirSyncAuditPage() {
     return () => clearInterval(t);
   }, [running]);
 
-  // eventos em tempo real durante a execução
-  useEffect(() => {
-    const ch = supabase
-      .channel("ctir-audit-live")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "sync_alerts" },
-        (payload: any) => {
-          const row = payload.new as Alert;
-          if (row?.source !== "ctir") return;
-          setLiveEvents(prev => [row, ...prev].slice(0, 30));
-        },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
   const runNow = async () => {
     setRunning(true);
-    setLiveEvents([]);
+    resetProgress();
+
     setLastResult(null);
     runStartRef.current = Date.now();
     setElapsed(0);
