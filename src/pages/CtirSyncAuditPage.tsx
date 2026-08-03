@@ -246,6 +246,22 @@ export default function CtirSyncAuditPage() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
           </Button>
+          <Select value={exportScope} onValueChange={(v) => setExportScope(v as ExportScope)}>
+            <SelectTrigger className="w-40 h-9" aria-label="Escopo da exportação">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos filtrados</SelectItem>
+              <SelectItem value="page">Página atual</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => doExport("csv")}>
+            <Download className="h-4 w-4 mr-2" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => doExport("pdf")}>
+            <FileText className="h-4 w-4 mr-2" /> PDF
+          </Button>
+
         </div>
       </div>
 
