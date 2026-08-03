@@ -375,10 +375,12 @@ export default function CtirSyncAuditPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="runs">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList>
           <TabsTrigger value="runs">Execuções ({filteredAudits.length})</TabsTrigger>
           <TabsTrigger value="alerts">Alertas ({filteredAlerts.length})</TabsTrigger>
+          <TabsTrigger value="tree">Causa-raiz</TabsTrigger>
+
         </TabsList>
 
         <TabsContent value="runs">
