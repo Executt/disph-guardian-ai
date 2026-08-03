@@ -13,7 +13,11 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play, Download, FileText, Wifi, WifiOff } from "lucide-react";
+import { useSyncProgress } from "@/hooks/useSyncProgress";
+import SyncCauseTree from "@/components/SyncCauseTree";
+import { exportCsv, exportPdf, type ExportScope } from "@/lib/ctirAuditExport";
+
 
 type AuditRow = {
   id: string;
