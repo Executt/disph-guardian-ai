@@ -272,6 +272,13 @@ export default function CtirSyncAuditPage() {
               {running ? <RefreshCw className="h-4 w-4 animate-spin text-primary" /> : <CheckCircle2 className="h-4 w-4 text-accent" />}
               {running ? "Execução em andamento" : "Última execução manual"}
               <span className="font-mono text-[11px] text-muted-foreground">{(elapsed / 1000).toFixed(1)}s</span>
+              <Badge variant="outline" data-testid="transport-badge" className={`text-[10px] font-mono ${transport === "websocket" ? "text-accent border-accent/40" : "text-warning border-warning/40"}`}>
+                {transport === "websocket"
+                  ? <><Wifi className="h-3 w-3 mr-1 inline" />stream</>
+                  : <><WifiOff className="h-3 w-3 mr-1 inline" />{transport === "polling" ? "polling" : "conectando"}</>}
+                {reconnects > 0 ? ` · ${reconnects} reconexão(ões)` : ""}
+              </Badge>
+
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
