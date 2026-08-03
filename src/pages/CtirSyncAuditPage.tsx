@@ -13,7 +13,11 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play, Download, FileText, Wifi, WifiOff } from "lucide-react";
+import { useSyncProgress } from "@/hooks/useSyncProgress";
+import SyncCauseTree from "@/components/SyncCauseTree";
+import { exportCsv, exportPdf, type ExportScope } from "@/lib/ctirAuditExport";
+
 
 type AuditRow = {
   id: string;
@@ -57,10 +61,16 @@ export default function CtirSyncAuditPage() {
 
   // execução em tempo real
   const [running, setRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<"runs" | "alerts" | "tree">("runs");
+
   const [elapsed, setElapsed] = useState(0);
-  const [liveEvents, setLiveEvents] = useState<Alert[]>([]);
   const [lastResult, setLastResult] = useState<any>(null);
   const runStartRef = useRef<number>(0);
+  const [exportScope, setExportScope] = useState<ExportScope>("all");
+
+  // stream de progresso (WebSocket + fallback polling + reconexão)
+  const { events: liveEvents, transport, reconnects, reset: resetProgress } = useSyncProgress("ctir");
+
 
   const load = async () => {
     setLoading(true);
@@ -93,26 +103,10 @@ export default function CtirSyncAuditPage() {
     return () => clearInterval(t);
   }, [running]);
 
-  // eventos em tempo real durante a execução
-  useEffect(() => {
-    const ch = supabase
-      .channel("ctir-audit-live")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "sync_alerts" },
-        (payload: any) => {
-          const row = payload.new as Alert;
-          if (row?.source !== "ctir") return;
-          setLiveEvents(prev => [row, ...prev].slice(0, 30));
-        },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
   const runNow = async () => {
     setRunning(true);
-    setLiveEvents([]);
+    resetProgress();
+
     setLastResult(null);
     runStartRef.current = Date.now();
     setElapsed(0);
@@ -201,6 +195,42 @@ export default function CtirSyncAuditPage() {
     setExpanded(next);
   };
 
+  const exportMetaBase = { year, month, severity: severityFilter, kind: kindFilter, scope: exportScope };
+
+  const runsExport = () => ({
+    headers: ["Data", "Origem", "Feeds", "Inseridos", "Atualizados", "Retries", "Erros", "Duração (ms)", "Falhas"],
+    rows: (exportScope === "page" ? pagedAudits : filteredAudits).map(a => {
+      const d = a.details ?? {};
+      return [
+        format(new Date(a.created_at), "dd/MM/yyyy HH:mm"),
+        d.trigger_source ?? "manual",
+        d.feeds_checked ?? 0, d.inserted ?? 0, d.updated ?? 0,
+        d.retries ?? 0, d.errors ?? 0, d.duration_ms ?? 0,
+        (d.failures ?? []).map((f: any) => `${f.kind ?? ""}/${f.year ?? ""}: ${f.reason ?? ""}`).join(" | "),
+      ];
+    }),
+  });
+
+  const alertsExport = () => ({
+    headers: ["Data", "Tipo", "Severidade", "Mensagem", "Status"],
+    rows: (exportScope === "page" ? pagedAlerts : filteredAlerts).map(a => [
+      format(new Date(a.created_at), "dd/MM/yyyy HH:mm"),
+      a.kind, a.severity, a.message, a.resolved_at ? "resolvido" : "aberto",
+    ]),
+  });
+
+  const doExport = (fmt: "csv" | "pdf") => {
+    const tab = activeTab === "alerts" ? "alerts" : "runs";
+    const { headers, rows } = tab === "alerts" ? alertsExport() : runsExport();
+    if (rows.length === 0) return toast.error("Nada para exportar com os filtros atuais");
+    const meta = { ...exportMetaBase, tab } as const;
+    fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
+    toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+  };
+
+
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -216,6 +246,22 @@ export default function CtirSyncAuditPage() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
           </Button>
+          <Select value={exportScope} onValueChange={(v) => setExportScope(v as ExportScope)}>
+            <SelectTrigger className="w-40 h-9" aria-label="Escopo da exportação">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos filtrados</SelectItem>
+              <SelectItem value="page">Página atual</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => doExport("csv")}>
+            <Download className="h-4 w-4 mr-2" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => doExport("pdf")}>
+            <FileText className="h-4 w-4 mr-2" /> PDF
+          </Button>
+
         </div>
       </div>
 
@@ -226,6 +272,13 @@ export default function CtirSyncAuditPage() {
               {running ? <RefreshCw className="h-4 w-4 animate-spin text-primary" /> : <CheckCircle2 className="h-4 w-4 text-accent" />}
               {running ? "Execução em andamento" : "Última execução manual"}
               <span className="font-mono text-[11px] text-muted-foreground">{(elapsed / 1000).toFixed(1)}s</span>
+              <Badge variant="outline" data-testid="transport-badge" className={`text-[10px] font-mono ${transport === "websocket" ? "text-accent border-accent/40" : "text-warning border-warning/40"}`}>
+                {transport === "websocket"
+                  ? <><Wifi className="h-3 w-3 mr-1 inline" />stream</>
+                  : <><WifiOff className="h-3 w-3 mr-1 inline" />{transport === "polling" ? "polling" : "conectando"}</>}
+                {reconnects > 0 ? ` · ${reconnects} reconexão(ões)` : ""}
+              </Badge>
+
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -322,10 +375,12 @@ export default function CtirSyncAuditPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="runs">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList>
           <TabsTrigger value="runs">Execuções ({filteredAudits.length})</TabsTrigger>
           <TabsTrigger value="alerts">Alertas ({filteredAlerts.length})</TabsTrigger>
+          <TabsTrigger value="tree">Causa-raiz</TabsTrigger>
+
         </TabsList>
 
         <TabsContent value="runs">
@@ -439,6 +494,11 @@ export default function CtirSyncAuditPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="tree">
+          <SyncCauseTree runs={pagedAudits} alerts={filteredAlerts} />
+        </TabsContent>
+
       </Tabs>
     </div>
   );
