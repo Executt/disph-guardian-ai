@@ -61,6 +61,8 @@ export default function CtirSyncAuditPage() {
 
   // execução em tempo real
   const [running, setRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<"runs" | "alerts" | "tree">("runs");
+
   const [elapsed, setElapsed] = useState(0);
   const [lastResult, setLastResult] = useState<any>(null);
   const runStartRef = useRef<number>(0);
