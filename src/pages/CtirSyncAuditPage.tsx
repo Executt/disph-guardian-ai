@@ -494,6 +494,11 @@ export default function CtirSyncAuditPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="tree">
+          <SyncCauseTree runs={pagedAudits} alerts={filteredAlerts} />
+        </TabsContent>
+
       </Tabs>
     </div>
   );
