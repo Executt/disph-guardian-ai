@@ -379,6 +379,52 @@ export default function CtirSyncAuditPage() {
         <SummaryCard icon={RefreshCw} label="Retentativas" value={summary.totalRetries} tone="warning" />
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card data-testid="kpi-avg-duration">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-primary" />
+              <span className="text-[10px] font-mono uppercase text-muted-foreground">Tempo médio de sincronização</span>
+            </div>
+            <div className="text-2xl font-bold heading mt-1 text-primary">
+              {(summary.avgDurationMs / 1000).toFixed(1)}s
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="kpi-failure-rate">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <Percent className="h-4 w-4 text-destructive" />
+              <span className="text-[10px] font-mono uppercase text-muted-foreground">Taxa de falhas</span>
+            </div>
+            <div className="text-2xl font-bold heading mt-1 text-destructive">{summary.failureRate}%</div>
+            <Progress className="mt-2" value={summary.failureRate} />
+          </CardContent>
+        </Card>
+        <Card data-testid="kpi-reason-dist">
+          <CardHeader className="pb-1">
+            <CardTitle className="heading text-sm">Distribuição de motivos</CardTitle>
+            <CardDescription>Período e filtros aplicados</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1 max-h-40 overflow-y-auto">
+            {reasonDist.rows.length === 0 ? (
+              <div className="text-xs font-mono text-muted-foreground">Sem falhas registradas.</div>
+            ) : reasonDist.rows.map(r => (
+              <div key={r.reason} className="text-[11px] font-mono">
+                <div className="flex justify-between gap-2">
+                  <span className="truncate" title={r.reason}>{r.reason}</span>
+                  <span className="text-muted-foreground">
+                    {r.count} · {reasonDist.total ? Math.round((r.count / reasonDist.total) * 100) : 0}%
+                  </span>
+                </div>
+                <Progress className="h-1 mt-0.5" value={reasonDist.total ? (r.count / reasonDist.total) * 100 : 0} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="heading text-sm">Alertas de sincronização por dia</CardTitle>
