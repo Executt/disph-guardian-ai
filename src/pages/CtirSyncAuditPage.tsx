@@ -506,7 +506,12 @@ export default function CtirSyncAuditPage() {
                     const isOpen = expanded.has(a.id);
                     return (
                       <>
-                        <TableRow key={a.id} className="cursor-pointer" onClick={() => toggle(a.id)}>
+                        <TableRow
+                          key={a.id}
+                          id={`run-${a.id}`}
+                          className={`cursor-pointer ${params.get("run") === a.id ? "bg-primary/5 ring-1 ring-primary/30" : ""}`}
+                          onClick={() => toggle(a.id)}
+                        >
                           <TableCell>{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                           <TableCell className="font-mono text-xs">
                             {format(new Date(a.created_at), "dd/MM HH:mm")}
