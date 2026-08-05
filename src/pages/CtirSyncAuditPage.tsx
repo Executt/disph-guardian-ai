@@ -236,6 +236,19 @@ export default function CtirSyncAuditPage() {
     setExpanded(next);
   };
 
+  // deep-link: abre a execução correspondente ao nó selecionado na árvore
+  const openRun = (runId: string) => {
+    const idx = filteredAudits.findIndex(a => a.id === runId);
+    if (idx >= 0) setRunsPage(Math.floor(idx / PAGE_SIZE));
+    setExpanded(prev => new Set([...prev, runId]));
+    patchParams({ tab: "runs", run: runId });
+    requestAnimationFrame(() => {
+      document.getElementById(`run-${runId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+
+
   const exportMetaBase = { year, month, severity: severityFilter, kind: kindFilter, scope: exportScope };
 
   const runsExport = () => ({
