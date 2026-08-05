@@ -63,7 +63,19 @@ export default function CtirSyncAuditPage() {
 
   // execução em tempo real
   const [running, setRunning] = useState(false);
-  const [activeTab, setActiveTab] = useState<"runs" | "alerts" | "tree">("runs");
+
+  // deep-link (aba, nó da árvore, execução)
+  const [params, setParams] = useSearchParams();
+  const activeTab = ((params.get("tab") as "runs" | "alerts" | "tree") ?? "runs");
+  const selectedNodeId = params.get("node");
+  const patchParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => (v == null ? next.delete(k) : next.set(k, v)));
+    setParams(next, { replace: true });
+  };
+  const setActiveTab = (t: string) => patchParams({ tab: t });
+
+
 
   const [elapsed, setElapsed] = useState(0);
   const [lastResult, setLastResult] = useState<any>(null);
