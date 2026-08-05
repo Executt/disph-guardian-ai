@@ -131,10 +131,71 @@ function NodeRow({ node, depth, selected, onSelect, open, toggle }: {
   );
 }
 
-export default function SyncCauseTree({ runs, alerts }: { runs: Run[]; alerts: Alert[] }) {
-  const trees = useMemo(() => runs.slice(0, 20).map(r => buildCauseTree(r, alerts)), [runs, alerts]);
-  const [open, setOpen] = useState<Set<string>>(new Set(trees.slice(0, 1).map(t => t.id)));
-  const [selected, setSelected] = useState<TreeNode | null>(null);
+function filterTree(node: TreeNode, q: string): TreeNode | null {
+  const hit = node.label.toLowerCase().includes(q) ||
+    JSON.stringify(node.meta ?? {}).toLowerCase().includes(q);
+  const kids = node.children.map(c => filterTree(c, q)).filter(Boolean) as TreeNode[];
+  if (!hit && kids.length === 0) return null;
+  return { ...node, children: hit ? node.children : kids };
+}
+
+function collectIds(node: TreeNode, acc: string[] = []) {
+  acc.push(node.id);
+  node.children.forEach(c => collectIds(c, acc));
+  return acc;
+}
+
+function findNode(node: TreeNode, id: string): TreeNode | null {
+  if (node.id === id) return node;
+  for (const c of node.children) {
+    const f = findNode(c, id);
+    if (f) return f;
+  }
+  return null;
+}
+
+export default function SyncCauseTree({ runs, alerts, selectedId, onSelectNode, onOpenRun }: {
+  runs: Run[];
+  alerts: Alert[];
+  selectedId?: string | null;
+  onSelectNode?: (nodeId: string, runId: string) => void;
+  onOpenRun?: (runId: string) => void;
+}) {
+  const allTrees = useMemo(() => runs.slice(0, 20).map(r => buildCauseTree(r, alerts)), [runs, alerts]);
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const trees = useMemo(
+    () => (query ? allTrees.map(t => filterTree(t, query)).filter(Boolean) as TreeNode[] : allTrees),
+    [allTrees, query],
+  );
+
+  const [open, setOpen] = useState<Set<string>>(new Set(allTrees.slice(0, 1).map(t => t.id)));
+  const [selectedLocal, setSelectedLocal] = useState<TreeNode | null>(null);
+
+  // busca expande tudo que sobrou
+  useEffect(() => {
+    if (query) setOpen(new Set(trees.flatMap(t => collectIds(t))));
+  }, [query, trees]);
+
+  // deep-link: seleciona e expande o nó vindo da URL
+  useEffect(() => {
+    if (!selectedId) return;
+    for (const t of allTrees) {
+      const found = findNode(t, selectedId);
+      if (found) {
+        setSelectedLocal(found);
+        setOpen(prev => new Set([...prev, ...collectIds(t)]));
+        return;
+      }
+    }
+  }, [selectedId, allTrees]);
+
+  const runIdOf = (nodeId: string) => allTrees.find(t => nodeId.startsWith(t.id))?.id ?? nodeId;
+
+  const selectNode = (n: TreeNode) => {
+    setSelectedLocal(n);
+    onSelectNode?.(n.id, runIdOf(n.id));
+  };
 
   const toggle = (id: string) => setOpen(prev => {
     const n = new Set(prev);
@@ -142,21 +203,33 @@ export default function SyncCauseTree({ runs, alerts }: { runs: Run[]; alerts: A
     return n;
   });
 
+  const selected = selectedLocal;
+
   return (
     <div className="grid md:grid-cols-[1.6fr_1fr] gap-4">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="heading text-sm">Árvore de causa-raiz</CardTitle>
           <CardDescription>Execução → feed → retentativas → erro → alerta</CardDescription>
+          <div className="relative pt-2">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Buscar por feed, erro, alerta…"
+              aria-label="Buscar na árvore"
+              className="pl-7 h-8 text-xs font-mono"
+            />
+          </div>
         </CardHeader>
         <CardContent className="max-h-[520px] overflow-y-auto" data-testid="cause-tree">
           {trees.length === 0 ? (
             <div className="text-xs font-mono text-muted-foreground py-6 text-center">
-              Nenhuma execução no período selecionado.
+              {query ? "Nenhum nó corresponde à busca." : "Nenhuma execução no período selecionado."}
             </div>
           ) : trees.map(t => (
             <NodeRow key={t.id} node={t} depth={0} selected={selected?.id ?? null}
-              onSelect={setSelected} open={open} toggle={toggle} />
+              onSelect={selectNode} open={open} toggle={toggle} />
           ))}
         </CardContent>
       </Card>
@@ -182,6 +255,15 @@ export default function SyncCauseTree({ runs, alerts }: { runs: Run[]; alerts: A
               <pre className="text-[10px] font-mono bg-muted/30 rounded p-2 overflow-x-auto max-h-72">
                 {JSON.stringify(selected.meta ?? {}, null, 2)}
               </pre>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                data-testid="open-run-detail"
+                onClick={() => onOpenRun?.(runIdOf(selected.id))}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-2" /> Abrir execução correspondente
+              </Button>
             </>
           )}
         </CardContent>
@@ -189,3 +271,4 @@ export default function SyncCauseTree({ runs, alerts }: { runs: Run[]; alerts: A
     </div>
   );
 }
+
