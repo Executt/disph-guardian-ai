@@ -13,3 +13,13 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+// Polyfills exigidos por componentes Radix (Select/Popover) no jsdom
+if (!(Element.prototype as any).hasPointerCapture) {
+  (Element.prototype as any).hasPointerCapture = () => false;
+  (Element.prototype as any).setPointerCapture = () => {};
+  (Element.prototype as any).releasePointerCapture = () => {};
+}
+if (!(Element.prototype as any).scrollIntoView) {
+  (Element.prototype as any).scrollIntoView = () => {};
+}

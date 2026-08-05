@@ -13,7 +13,9 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play, Download, FileText, Wifi, WifiOff } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircle, Clock, Play, Download, FileText, Wifi, WifiOff, Timer, Percent } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+
 import { useSyncProgress } from "@/hooks/useSyncProgress";
 import SyncCauseTree from "@/components/SyncCauseTree";
 import { exportCsv, exportPdf, type ExportScope } from "@/lib/ctirAuditExport";
@@ -61,7 +63,19 @@ export default function CtirSyncAuditPage() {
 
   // execução em tempo real
   const [running, setRunning] = useState(false);
-  const [activeTab, setActiveTab] = useState<"runs" | "alerts" | "tree">("runs");
+
+  // deep-link (aba, nó da árvore, execução)
+  const [params, setParams] = useSearchParams();
+  const activeTab = ((params.get("tab") as "runs" | "alerts" | "tree") ?? "runs");
+  const selectedNodeId = params.get("node");
+  const patchParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => (v == null ? next.delete(k) : next.set(k, v)));
+    setParams(next, { replace: true });
+  };
+  const setActiveTab = (t: string) => patchParams({ tab: t });
+
+
 
   const [elapsed, setElapsed] = useState(0);
   const [lastResult, setLastResult] = useState<any>(null);
@@ -168,8 +182,35 @@ export default function CtirSyncAuditPage() {
     const success = total - withErrors;
     const totalInserted = filteredAudits.reduce((s, a) => s + (a.details?.inserted ?? 0), 0);
     const totalRetries = filteredAudits.reduce((s, a) => s + (a.details?.retries ?? 0), 0);
-    return { total, success, withErrors, totalInserted, totalRetries };
+    const durations = filteredAudits.map(a => a.details?.duration_ms ?? 0).filter(n => n > 0);
+    const avgDurationMs = durations.length
+      ? Math.round(durations.reduce((s, n) => s + n, 0) / durations.length)
+      : 0;
+    const failureRate = total ? Math.round((withErrors / total) * 1000) / 10 : 0;
+    return { total, success, withErrors, totalInserted, totalRetries, avgDurationMs, failureRate };
   }, [filteredAudits]);
+
+  // distribuição de motivos de falha no período filtrado
+  const reasonDist = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredAudits.forEach(a => {
+      (a.details?.failures ?? []).forEach((f: any) => {
+        const raw = String(f.reason ?? "erro desconhecido");
+        const key = raw.replace(/\d{2,}/g, "N").slice(0, 60);
+        counts[key] = (counts[key] ?? 0) + 1;
+      });
+    });
+    filteredAlerts.forEach(a => {
+      if (!a.details?.feed_url) return;
+      const key = String(a.kind);
+      counts[key] = (counts[key] ?? 0) + 0; // mantém chaves de falhas como fonte primária
+    });
+    const rows = Object.entries(counts).map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count).slice(0, 8);
+    const total = rows.reduce((s, r) => s + r.count, 0);
+    return { rows, total };
+  }, [filteredAudits, filteredAlerts]);
+
 
   // contagem por data consistente com os mesmos filtros aplicados
   const chartData = useMemo(() => {
@@ -194,6 +235,19 @@ export default function CtirSyncAuditPage() {
     next.has(id) ? next.delete(id) : next.add(id);
     setExpanded(next);
   };
+
+  // deep-link: abre a execução correspondente ao nó selecionado na árvore
+  const openRun = (runId: string) => {
+    const idx = filteredAudits.findIndex(a => a.id === runId);
+    if (idx >= 0) setRunsPage(Math.floor(idx / PAGE_SIZE));
+    setExpanded(prev => new Set([...prev, runId]));
+    patchParams({ tab: "runs", run: runId });
+    requestAnimationFrame(() => {
+      document.getElementById(`run-${runId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+
 
   const exportMetaBase = { year, month, severity: severityFilter, kind: kindFilter, scope: exportScope };
 
@@ -352,6 +406,52 @@ export default function CtirSyncAuditPage() {
         <SummaryCard icon={RefreshCw} label="Retentativas" value={summary.totalRetries} tone="warning" />
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card data-testid="kpi-avg-duration">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-primary" />
+              <span className="text-[10px] font-mono uppercase text-muted-foreground">Tempo médio de sincronização</span>
+            </div>
+            <div className="text-2xl font-bold heading mt-1 text-primary">
+              {(summary.avgDurationMs / 1000).toFixed(1)}s
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="kpi-failure-rate">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <Percent className="h-4 w-4 text-destructive" />
+              <span className="text-[10px] font-mono uppercase text-muted-foreground">Taxa de falhas</span>
+            </div>
+            <div className="text-2xl font-bold heading mt-1 text-destructive">{summary.failureRate}%</div>
+            <Progress className="mt-2" value={summary.failureRate} />
+          </CardContent>
+        </Card>
+        <Card data-testid="kpi-reason-dist">
+          <CardHeader className="pb-1">
+            <CardTitle className="heading text-sm">Distribuição de motivos</CardTitle>
+            <CardDescription>Período e filtros aplicados</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1 max-h-40 overflow-y-auto">
+            {reasonDist.rows.length === 0 ? (
+              <div className="text-xs font-mono text-muted-foreground">Sem falhas registradas.</div>
+            ) : reasonDist.rows.map(r => (
+              <div key={r.reason} className="text-[11px] font-mono">
+                <div className="flex justify-between gap-2">
+                  <span className="truncate" title={r.reason}>{r.reason}</span>
+                  <span className="text-muted-foreground">
+                    {r.count} · {reasonDist.total ? Math.round((r.count / reasonDist.total) * 100) : 0}%
+                  </span>
+                </div>
+                <Progress className="h-1 mt-0.5" value={reasonDist.total ? (r.count / reasonDist.total) * 100 : 0} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="heading text-sm">Alertas de sincronização por dia</CardTitle>
@@ -406,7 +506,12 @@ export default function CtirSyncAuditPage() {
                     const isOpen = expanded.has(a.id);
                     return (
                       <>
-                        <TableRow key={a.id} className="cursor-pointer" onClick={() => toggle(a.id)}>
+                        <TableRow
+                          key={a.id}
+                          id={`run-${a.id}`}
+                          className={`cursor-pointer ${params.get("run") === a.id ? "bg-primary/5 ring-1 ring-primary/30" : ""}`}
+                          onClick={() => toggle(a.id)}
+                        >
                           <TableCell>{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                           <TableCell className="font-mono text-xs">
                             {format(new Date(a.created_at), "dd/MM HH:mm")}
@@ -496,7 +601,14 @@ export default function CtirSyncAuditPage() {
         </TabsContent>
 
         <TabsContent value="tree">
-          <SyncCauseTree runs={pagedAudits} alerts={filteredAlerts} />
+          <SyncCauseTree
+            runs={filteredAudits.slice(0, 20)}
+            alerts={filteredAlerts}
+            selectedId={selectedNodeId}
+            onSelectNode={(nodeId, runId) => patchParams({ node: nodeId, run: runId })}
+            onOpenRun={openRun}
+          />
+
         </TabsContent>
 
       </Tabs>
