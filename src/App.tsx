@@ -45,7 +45,14 @@ const App = () => (
             >
               <Route path="/" element={<Index />} />
               <Route path="/security-overview" element={<SecurityOverviewPage />} />
-              <Route path="/security-overview/ctir-audit" element={<CtirSyncAuditPage />} />
+              <Route
+                path="/security-overview/ctir-audit"
+                element={
+                  <ProtectedRoute requiredRoles={["admin", "auditor"]}>
+                    <CtirSyncAuditPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/incidents" element={<IncidentsPage />} />
               <Route path="/ar" element={<ARPage />} />
               <Route path="/vulnerabilities" element={<VulnerabilitiesPage />} />
