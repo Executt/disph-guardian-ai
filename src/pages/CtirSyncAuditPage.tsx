@@ -168,8 +168,35 @@ export default function CtirSyncAuditPage() {
     const success = total - withErrors;
     const totalInserted = filteredAudits.reduce((s, a) => s + (a.details?.inserted ?? 0), 0);
     const totalRetries = filteredAudits.reduce((s, a) => s + (a.details?.retries ?? 0), 0);
-    return { total, success, withErrors, totalInserted, totalRetries };
+    const durations = filteredAudits.map(a => a.details?.duration_ms ?? 0).filter(n => n > 0);
+    const avgDurationMs = durations.length
+      ? Math.round(durations.reduce((s, n) => s + n, 0) / durations.length)
+      : 0;
+    const failureRate = total ? Math.round((withErrors / total) * 1000) / 10 : 0;
+    return { total, success, withErrors, totalInserted, totalRetries, avgDurationMs, failureRate };
   }, [filteredAudits]);
+
+  // distribuição de motivos de falha no período filtrado
+  const reasonDist = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredAudits.forEach(a => {
+      (a.details?.failures ?? []).forEach((f: any) => {
+        const raw = String(f.reason ?? "erro desconhecido");
+        const key = raw.replace(/\d{2,}/g, "N").slice(0, 60);
+        counts[key] = (counts[key] ?? 0) + 1;
+      });
+    });
+    filteredAlerts.forEach(a => {
+      if (!a.details?.feed_url) return;
+      const key = String(a.kind);
+      counts[key] = (counts[key] ?? 0) + 0; // mantém chaves de falhas como fonte primária
+    });
+    const rows = Object.entries(counts).map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count).slice(0, 8);
+    const total = rows.reduce((s, r) => s + r.count, 0);
+    return { rows, total };
+  }, [filteredAudits, filteredAlerts]);
+
 
   // contagem por data consistente com os mesmos filtros aplicados
   const chartData = useMemo(() => {
