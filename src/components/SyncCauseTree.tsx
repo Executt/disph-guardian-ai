@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight, Play, Rss, AlertTriangle, RefreshCw, Bug, CircleDot } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ChevronDown, ChevronRight, Play, Rss, AlertTriangle, RefreshCw, Bug, CircleDot, Search, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
+
 
 export type TreeNode = {
   id: string;
