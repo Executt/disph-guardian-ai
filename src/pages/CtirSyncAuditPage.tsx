@@ -583,7 +583,14 @@ export default function CtirSyncAuditPage() {
         </TabsContent>
 
         <TabsContent value="tree">
-          <SyncCauseTree runs={pagedAudits} alerts={filteredAlerts} />
+          <SyncCauseTree
+            runs={filteredAudits.slice(0, 20)}
+            alerts={filteredAlerts}
+            selectedId={selectedNodeId}
+            onSelectNode={(nodeId, runId) => patchParams({ node: nodeId, run: runId })}
+            onOpenRun={openRun}
+          />
+
         </TabsContent>
 
       </Tabs>
