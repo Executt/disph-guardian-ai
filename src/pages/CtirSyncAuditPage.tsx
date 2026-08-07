@@ -366,9 +366,19 @@ export default function CtirSyncAuditPage() {
           <Button variant="outline" size="sm" onClick={() => doExport("pdf")}>
             <FileText className="h-4 w-4 mr-2" /> PDF
           </Button>
-
+          <Select value={String(pageSize)} onValueChange={setPageSize}>
+            <SelectTrigger className="w-32 h-9" aria-label="Registros por página">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZES.map(n => <SelectItem key={n} value={String(n)}>{n} / página</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
+
+      <ExportJobsPanel jobs={exportJobs} onDownload={downloadJob} onRemove={removeJob} />
+
 
       {(running || lastResult) && (
         <Card data-testid="run-progress">
