@@ -287,6 +287,12 @@ export default function CtirSyncAuditPage() {
 
 
 
+  // renderização por janela (mantém desempenho com páginas grandes)
+  const runsWindow = useWindowedRows(pagedAudits.length, { rowHeight: ROW_HEIGHT });
+  const alertsWindow = useWindowedRows(pagedAlerts.length, { rowHeight: ROW_HEIGHT });
+  const windowedAudits = pagedAudits.slice(runsWindow.start, runsWindow.end);
+  const windowedAlerts = pagedAlerts.slice(alertsWindow.start, alertsWindow.end);
+
   const exportMetaBase = { year, month, severity: severityFilter, kind: kindFilter, scope: exportScope };
 
   const runsExport = () => ({
