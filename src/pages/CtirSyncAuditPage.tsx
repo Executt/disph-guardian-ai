@@ -39,7 +39,9 @@ type Alert = {
   resolved_at: string | null;
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZES = [20, 50, 100, 250];
+const DEFAULT_PAGE_SIZE = 20;
+const ROW_HEIGHT = 56;
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
@@ -51,39 +53,74 @@ export default function CtirSyncAuditPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // filtros
-  const [severityFilter, setSeverityFilter] = useState<string>("all");
-  const [kindFilter, setKindFilter] = useState<string>("all");
-  const [year, setYear] = useState<string>("all");
-  const [month, setMonth] = useState<string>("all");
-
-  // paginação
-  const [runsPage, setRunsPage] = useState(0);
-  const [alertsPage, setAlertsPage] = useState(0);
-
   // execução em tempo real
   const [running, setRunning] = useState(false);
 
-  // deep-link (aba, nó da árvore, execução)
+  // ---- estado 100% persistido na URL (deep-link reprodutível) ----
   const [params, setParams] = useSearchParams();
-  const activeTab = ((params.get("tab") as "runs" | "alerts" | "tree") ?? "runs");
-  const selectedNodeId = params.get("node");
   const patchParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
-    Object.entries(patch).forEach(([k, v]) => (v == null ? next.delete(k) : next.set(k, v)));
+    Object.entries(patch).forEach(([k, v]) => (v == null || v === "" ? next.delete(k) : next.set(k, v)));
     setParams(next, { replace: true });
   };
-  const setActiveTab = (t: string) => patchParams({ tab: t });
 
+  const activeTab = ((params.get("tab") as "runs" | "alerts" | "tree") ?? "runs");
+  const selectedNodeId = params.get("node");
+  const setActiveTab = (t: string) => patchParams({ tab: t === "runs" ? null : t });
 
+  // filtros
+  const year = params.get("year") ?? "all";
+  const month = params.get("month") ?? "all";
+  const severityFilter = params.get("sev") ?? "all";
+  const kindFilter = params.get("kind") ?? "all";
+  const setFilter = (key: "year" | "month" | "sev" | "kind") => (v: string) =>
+    patchParams({ [key]: v === "all" ? null : v, rp: null, ap: null });
+  const setYear = setFilter("year");
+  const setMonth = setFilter("month");
+  const setSeverityFilter = setFilter("sev");
+  const setKindFilter = setFilter("kind");
+
+  // paginação
+  const pageSize = PAGE_SIZES.includes(Number(params.get("ps"))) ? Number(params.get("ps")) : DEFAULT_PAGE_SIZE;
+  const setPageSize = (v: string) => patchParams({ ps: v === String(DEFAULT_PAGE_SIZE) ? null : v, rp: null, ap: null });
+  const runsPage = Math.max(0, Number(params.get("rp") ?? 0) || 0);
+  const alertsPage = Math.max(0, Number(params.get("ap") ?? 0) || 0);
+  const setRunsPage = (n: number) => patchParams({ rp: n > 0 ? String(n) : null });
+  const setAlertsPage = (n: number) => patchParams({ ap: n > 0 ? String(n) : null });
 
   const [elapsed, setElapsed] = useState(0);
   const [lastResult, setLastResult] = useState<any>(null);
   const runStartRef = useRef<number>(0);
-  const [exportScope, setExportScope] = useState<ExportScope>("all");
+  const exportScope = ((params.get("scope") as ExportScope) ?? "all");
+  const setExportScope = (v: string) => patchParams({ scope: v === "all" ? null : v });
 
   // stream de progresso (WebSocket + fallback polling + reconexão)
   const { events: liveEvents, transport, reconnects, reset: resetProgress } = useSyncProgress("ctir");
+
+  // fila assíncrona de exportação (geração em background + download assinado)
+  const { jobs: exportJobs, enqueue, download: downloadJob, remove: removeJob } = useExportQueue("ctir_audit");
+
+  // virtualização das tabelas (renderização por janela)
+  const runsWindow = useWindowedRows(0, { rowHeight: ROW_HEIGHT });
+
+  // posição de scroll persistida na URL
+  const scrollY = Number(params.get("y") ?? 0) || 0;
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    const onScroll = () => {
+      const y = Math.round(window.scrollY);
+      const cur = Number(params.get("y") ?? 0) || 0;
+      if (Math.abs(y - cur) > 80) patchParams({ y: y > 0 ? String(y) : null });
+    };
+    const debounced = () => {
+      window.clearTimeout((debounced as any)._t);
+      (debounced as any)._t = window.setTimeout(onScroll, 300);
+    };
+    window.addEventListener("scroll", debounced, { passive: true });
+    return () => window.removeEventListener("scroll", debounced);
+  });
+
+
 
 
   const load = async () => {
