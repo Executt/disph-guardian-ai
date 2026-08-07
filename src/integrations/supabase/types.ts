@@ -521,6 +521,63 @@ export type Database = {
         }
         Relationships: []
       }
+      export_jobs: {
+        Row: {
+          created_at: string
+          error: string | null
+          filters: Json
+          finished_at: string | null
+          format: string
+          id: string
+          progress: number
+          row_count: number
+          scope: string
+          source: string
+          started_at: string | null
+          status: string
+          storage_path: string | null
+          tab: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          filters?: Json
+          finished_at?: string | null
+          format: string
+          id?: string
+          progress?: number
+          row_count?: number
+          scope?: string
+          source?: string
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          tab: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          filters?: Json
+          finished_at?: string | null
+          format?: string
+          id?: string
+          progress?: number
+          row_count?: number
+          scope?: string
+          source?: string
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          tab?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       hypervisor_agent_logs: {
         Row: {
           agent_name: string

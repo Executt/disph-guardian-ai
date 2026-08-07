@@ -280,3 +280,25 @@ Além das 6 tabelas já documentadas, o schema possui mais **10 tabelas** em pro
 - **`skill_catalog_settings`** — flags por skill (habilitada, exige aprovação, riskLevel override).
 
 **RLS:** todas as 10 tabelas possuem 4 políticas (CRUD por role) exceto `ctir_sync_state` e `audit_logs` (2 — SELECT admin/auditor, INSERT service_role).
+
+---
+
+## Tabela `export_jobs`
+
+| Coluna | Tipo | Notas |
+| --- | --- | --- |
+| `id` | uuid PK | |
+| `user_id` | uuid NOT NULL | dono do job (base da RLS) |
+| `source` | text | origem lógica (`ctir_audit`) |
+| `tab` | text | `runs` \| `alerts` |
+| `format` | text | `csv` \| `pdf` |
+| `scope` | text | `all` \| `page` |
+| `filters` | jsonb | snapshot dos filtros/paginação aplicados |
+| `status` | text | `queued` → `running` → `done` \| `failed` \| `cancelled` |
+| `progress` | int | 0–100 |
+| `row_count` | int | registros exportados |
+| `storage_path` | text | `<uid>/<jobId>.<ext>` no bucket `ctir-exports` |
+| `error` | text | motivo da falha |
+| `started_at`, `finished_at`, `created_at`, `updated_at` | timestamptz | |
+
+Storage: bucket **privado** `ctir-exports`, com políticas por prefixo `auth.uid()`.

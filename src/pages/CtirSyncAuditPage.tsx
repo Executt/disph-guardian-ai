@@ -17,6 +17,9 @@ import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircl
 import { useSearchParams } from "react-router-dom";
 
 import { useSyncProgress } from "@/hooks/useSyncProgress";
+import { useWindowedRows } from "@/hooks/useWindowedRows";
+import { useExportQueue } from "@/hooks/useExportQueue";
+import ExportJobsPanel from "@/components/ExportJobsPanel";
 import SyncCauseTree from "@/components/SyncCauseTree";
 import { exportCsv, exportPdf, type ExportScope } from "@/lib/ctirAuditExport";
 
@@ -39,7 +42,9 @@ type Alert = {
   resolved_at: string | null;
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZES = [20, 50, 100, 250];
+const DEFAULT_PAGE_SIZE = 20;
+const ROW_HEIGHT = 56;
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
@@ -51,39 +56,72 @@ export default function CtirSyncAuditPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // filtros
-  const [severityFilter, setSeverityFilter] = useState<string>("all");
-  const [kindFilter, setKindFilter] = useState<string>("all");
-  const [year, setYear] = useState<string>("all");
-  const [month, setMonth] = useState<string>("all");
-
-  // paginação
-  const [runsPage, setRunsPage] = useState(0);
-  const [alertsPage, setAlertsPage] = useState(0);
-
   // execução em tempo real
   const [running, setRunning] = useState(false);
 
-  // deep-link (aba, nó da árvore, execução)
+  // ---- estado 100% persistido na URL (deep-link reprodutível) ----
   const [params, setParams] = useSearchParams();
-  const activeTab = ((params.get("tab") as "runs" | "alerts" | "tree") ?? "runs");
-  const selectedNodeId = params.get("node");
   const patchParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
-    Object.entries(patch).forEach(([k, v]) => (v == null ? next.delete(k) : next.set(k, v)));
+    Object.entries(patch).forEach(([k, v]) => (v == null || v === "" ? next.delete(k) : next.set(k, v)));
     setParams(next, { replace: true });
   };
-  const setActiveTab = (t: string) => patchParams({ tab: t });
 
+  const activeTab = ((params.get("tab") as "runs" | "alerts" | "tree") ?? "runs");
+  const selectedNodeId = params.get("node");
+  const setActiveTab = (t: string) => patchParams({ tab: t === "runs" ? null : t });
 
+  // filtros
+  const year = params.get("year") ?? "all";
+  const month = params.get("month") ?? "all";
+  const severityFilter = params.get("sev") ?? "all";
+  const kindFilter = params.get("kind") ?? "all";
+  const setFilter = (key: "year" | "month" | "sev" | "kind") => (v: string) =>
+    patchParams({ [key]: v === "all" ? null : v, rp: null, ap: null });
+  const setYear = setFilter("year");
+  const setMonth = setFilter("month");
+  const setSeverityFilter = setFilter("sev");
+  const setKindFilter = setFilter("kind");
+
+  // paginação
+  const pageSize = PAGE_SIZES.includes(Number(params.get("ps"))) ? Number(params.get("ps")) : DEFAULT_PAGE_SIZE;
+  const setPageSize = (v: string) => patchParams({ ps: v === String(DEFAULT_PAGE_SIZE) ? null : v, rp: null, ap: null });
+  const runsPage = Math.max(0, Number(params.get("rp") ?? 0) || 0);
+  const alertsPage = Math.max(0, Number(params.get("ap") ?? 0) || 0);
+  const setRunsPage = (n: number) => patchParams({ rp: n > 0 ? String(n) : null });
+  const setAlertsPage = (n: number) => patchParams({ ap: n > 0 ? String(n) : null });
 
   const [elapsed, setElapsed] = useState(0);
   const [lastResult, setLastResult] = useState<any>(null);
   const runStartRef = useRef<number>(0);
-  const [exportScope, setExportScope] = useState<ExportScope>("all");
+  const exportScope = ((params.get("scope") as ExportScope) ?? "all");
+  const setExportScope = (v: string) => patchParams({ scope: v === "all" ? null : v });
 
   // stream de progresso (WebSocket + fallback polling + reconexão)
   const { events: liveEvents, transport, reconnects, reset: resetProgress } = useSyncProgress("ctir");
+
+  // fila assíncrona de exportação (geração em background + download assinado)
+  const { jobs: exportJobs, enqueue, download: downloadJob, remove: removeJob } = useExportQueue("ctir_audit");
+
+
+  // posição de scroll persistida na URL
+  const scrollY = Number(params.get("y") ?? 0) || 0;
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    const onScroll = () => {
+      const y = Math.round(window.scrollY);
+      const cur = Number(params.get("y") ?? 0) || 0;
+      if (Math.abs(y - cur) > 80) patchParams({ y: y > 0 ? String(y) : null });
+    };
+    const debounced = () => {
+      window.clearTimeout((debounced as any)._t);
+      (debounced as any)._t = window.setTimeout(onScroll, 300);
+    };
+    window.addEventListener("scroll", debounced, { passive: true });
+    return () => window.removeEventListener("scroll", debounced);
+  });
+
+
 
 
   const load = async () => {
@@ -227,8 +265,8 @@ export default function CtirSyncAuditPage() {
     return Object.values(buckets).sort((a, b) => a.key - b.key).slice(-31);
   }, [filteredAlerts]);
 
-  const pagedAudits = filteredAudits.slice(runsPage * PAGE_SIZE, runsPage * PAGE_SIZE + PAGE_SIZE);
-  const pagedAlerts = filteredAlerts.slice(alertsPage * PAGE_SIZE, alertsPage * PAGE_SIZE + PAGE_SIZE);
+  const pagedAudits = filteredAudits.slice(runsPage * pageSize, runsPage * pageSize + pageSize);
+  const pagedAlerts = filteredAlerts.slice(alertsPage * pageSize, alertsPage * pageSize + pageSize);
 
   const toggle = (id: string) => {
     const next = new Set(expanded);
@@ -239,7 +277,7 @@ export default function CtirSyncAuditPage() {
   // deep-link: abre a execução correspondente ao nó selecionado na árvore
   const openRun = (runId: string) => {
     const idx = filteredAudits.findIndex(a => a.id === runId);
-    if (idx >= 0) setRunsPage(Math.floor(idx / PAGE_SIZE));
+    if (idx >= 0) setRunsPage(Math.floor(idx / pageSize));
     setExpanded(prev => new Set([...prev, runId]));
     patchParams({ tab: "runs", run: runId });
     requestAnimationFrame(() => {
@@ -248,6 +286,12 @@ export default function CtirSyncAuditPage() {
   };
 
 
+
+  // renderização por janela (mantém desempenho com páginas grandes)
+  const runsWindow = useWindowedRows(pagedAudits.length, { rowHeight: ROW_HEIGHT });
+  const alertsWindow = useWindowedRows(pagedAlerts.length, { rowHeight: ROW_HEIGHT });
+  const windowedAudits = pagedAudits.slice(runsWindow.start, runsWindow.end);
+  const windowedAlerts = pagedAlerts.slice(alertsWindow.start, alertsWindow.end);
 
   const exportMetaBase = { year, month, severity: severityFilter, kind: kindFilter, scope: exportScope };
 
@@ -273,14 +317,25 @@ export default function CtirSyncAuditPage() {
     ]),
   });
 
-  const doExport = (fmt: "csv" | "pdf") => {
+  const doExport = async (fmt: "csv" | "pdf") => {
     const tab = activeTab === "alerts" ? "alerts" : "runs";
     const { headers, rows } = tab === "alerts" ? alertsExport() : runsExport();
     if (rows.length === 0) return toast.error("Nada para exportar com os filtros atuais");
     const meta = { ...exportMetaBase, tab } as const;
-    fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
-    toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+    try {
+      // fila assíncrona: geração em background + download por link assinado (RLS)
+      await enqueue(
+        { tab, format: fmt, scope: exportScope, filters: meta },
+        { headers, rows, meta },
+      );
+      toast.success(`Exportação ${fmt.toUpperCase()} enfileirada (${rows.length} registros)`);
+    } catch {
+      // fallback local quando a fila não está disponível
+      fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
+      toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+    }
   };
+
 
 
 
@@ -315,9 +370,19 @@ export default function CtirSyncAuditPage() {
           <Button variant="outline" size="sm" onClick={() => doExport("pdf")}>
             <FileText className="h-4 w-4 mr-2" /> PDF
           </Button>
-
+          <Select value={String(pageSize)} onValueChange={setPageSize}>
+            <SelectTrigger className="w-32 h-9" aria-label="Registros por página">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZES.map(n => <SelectItem key={n} value={String(n)}>{n} / página</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
+
+      <ExportJobsPanel jobs={exportJobs} onDownload={downloadJob} onRemove={removeJob} />
+
 
       {(running || lastResult) && (
         <Card data-testid="run-progress">
@@ -486,6 +551,13 @@ export default function CtirSyncAuditPage() {
         <TabsContent value="runs">
           <Card>
             <CardContent className="pt-4">
+              <div
+                ref={runsWindow.containerRef}
+                onScroll={runsWindow.onScroll}
+                data-testid="runs-scroll"
+                className={runsWindow.active ? "overflow-y-auto" : ""}
+                style={runsWindow.active ? { maxHeight: 560 } : undefined}
+              >
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -501,7 +573,11 @@ export default function CtirSyncAuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedAudits.map(a => {
+                  {runsWindow.padTop > 0 && (
+                    <TableRow style={{ height: runsWindow.padTop }} aria-hidden><TableCell colSpan={9} /></TableRow>
+                  )}
+                  {windowedAudits.map(a => {
+
                     const d = a.details ?? {};
                     const isOpen = expanded.has(a.id);
                     return (
@@ -541,6 +617,9 @@ export default function CtirSyncAuditPage() {
                       </>
                     );
                   })}
+                  {runsWindow.padBottom > 0 && (
+                    <TableRow style={{ height: runsWindow.padBottom }} aria-hidden><TableCell colSpan={9} /></TableRow>
+                  )}
                   {filteredAudits.length === 0 && !loading && (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">
                       Nenhuma execução registrada no período selecionado.
@@ -548,7 +627,8 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
-              <Pager page={runsPage} setPage={setRunsPage} total={filteredAudits.length} />
+              </div>
+              <Pager page={runsPage} setPage={setRunsPage} total={filteredAudits.length} pageSize={pageSize} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -556,6 +636,13 @@ export default function CtirSyncAuditPage() {
         <TabsContent value="alerts">
           <Card>
             <CardContent className="pt-4">
+              <div
+                ref={alertsWindow.containerRef}
+                onScroll={alertsWindow.onScroll}
+                data-testid="alerts-scroll"
+                className={alertsWindow.active ? "overflow-y-auto" : ""}
+                style={alertsWindow.active ? { maxHeight: 560 } : undefined}
+              >
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -567,7 +654,10 @@ export default function CtirSyncAuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedAlerts.map(a => (
+                  {alertsWindow.padTop > 0 && (
+                    <TableRow style={{ height: alertsWindow.padTop }} aria-hidden><TableCell colSpan={5} /></TableRow>
+                  )}
+                  {windowedAlerts.map(a => (
                     <TableRow key={a.id}>
                       <TableCell className="font-mono text-xs">
                         {formatDistanceToNow(new Date(a.created_at), { addSuffix: true, locale: ptBR })}
@@ -588,6 +678,9 @@ export default function CtirSyncAuditPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {alertsWindow.padBottom > 0 && (
+                    <TableRow style={{ height: alertsWindow.padBottom }} aria-hidden><TableCell colSpan={5} /></TableRow>
+                  )}
                   {filteredAlerts.length === 0 && (
                     <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
                       Sem alertas.
@@ -595,7 +688,9 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
-              <Pager page={alertsPage} setPage={setAlertsPage} total={filteredAlerts.length} />
+              </div>
+              <Pager page={alertsPage} setPage={setAlertsPage} total={filteredAlerts.length} pageSize={pageSize} />
+
             </CardContent>
           </Card>
         </TabsContent>
@@ -616,12 +711,12 @@ export default function CtirSyncAuditPage() {
   );
 }
 
-function Pager({ page, setPage, total }: { page: number; setPage: (n: number) => void; total: number }) {
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+function Pager({ page, setPage, total, pageSize }: { page: number; setPage: (n: number) => void; total: number; pageSize: number }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="flex items-center justify-between pt-3 text-xs font-mono">
       <span className="text-muted-foreground">
-        {total === 0 ? "0 registros" : `${page * PAGE_SIZE + 1}–${Math.min(total, (page + 1) * PAGE_SIZE)} de ${total}`}
+        {total === 0 ? "0 registros" : `${page * pageSize + 1}–${Math.min(total, (page + 1) * pageSize)} de ${total}`}
       </span>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</Button>
