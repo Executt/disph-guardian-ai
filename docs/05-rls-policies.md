@@ -163,3 +163,10 @@ Cenários mínimos a testar (PRs novos):
 4. **Anon** tenta SELECT qualquer tabela → 401
 5. **Admin** consegue SELECT/INSERT/UPDATE/DELETE em tudo
 6. **Auditor** lê `audit_logs`, mas não consegue UPDATE → 403
+
+---
+
+## `export_jobs` e bucket `ctir-exports`
+
+- **export_jobs:** cada usuário lê/cria/atualiza/apaga apenas jobs onde `user_id = auth.uid()`; `anon` não tem acesso.
+- **Storage `ctir-exports`:** bucket privado. Leitura, escrita e remoção limitadas a objetos cujo primeiro segmento do caminho é o `auth.uid()` do solicitante. O download ocorre via URL assinada de curta duração (60s), garantindo que exportações de auditoria não sejam acessíveis por link permanente.

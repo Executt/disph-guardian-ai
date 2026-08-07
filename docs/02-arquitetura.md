@@ -282,3 +282,33 @@ Configuráveis via **Admin → Integrações**:
 **SEI (Sistema Eletrônico de Informações):** marcado como **roadmap / não implementado**. Removido das integrações ativas. Atual stack ITSM: GLPI, Jira, ServiceNow, CITSmart, Freshservice, Azure DevOps.
 
 **Modelos de IA:** centralizados em `src/lib/aiModels.ts` (fonte única). `AIChatConsole`, `SettingsPage`, `AdminPage`, `AgentsPage`, `AgentDetailPage` consomem desta lib.
+
+---
+
+## Exportação assíncrona e virtualização (Auditoria CTIR)
+
+### Fila de exportação (`src/hooks/useExportQueue.ts`)
+1. A UI enfileira um job em `public.export_jobs` (`status = queued`, filtros em `jsonb`).
+2. Um worker local processa a fila **sequencialmente e em fatias de 250 linhas**, cedendo o event loop entre fatias (UI nunca trava) e atualizando `progress` (0→100).
+3. O artefato (CSV/PDF) é gravado no bucket privado `ctir-exports` em `<uid>/<jobId>.<ext>`.
+4. O download usa **URL assinada de 60s** — nenhum arquivo é público.
+5. Falhas gravam `status = failed` + `error`, exibidos no painel.
+
+Componente de status: `src/components/ExportJobsPanel.tsx` (progresso, download, remoção — remove também o objeto no storage).
+Fallback: quando não há sessão/fila disponível, a exportação síncrona de `src/lib/ctirAuditExport.ts` é usada.
+
+### Estado na URL
+`/security-overview/ctir-audit` persiste **todo** o estado em query params, tornando qualquer deep-link reprodutível:
+
+| Param | Significado | Default |
+| --- | --- | --- |
+| `tab` | aba (`runs`/`alerts`/`tree`) | `runs` |
+| `year`, `month`, `sev`, `kind` | filtros | `all` |
+| `ps` | registros por página (20/50/100/250) | `20` |
+| `rp`, `ap` | página de execuções / alertas | `0` |
+| `scope` | escopo da exportação (`all`/`page`) | `all` |
+| `node`, `run` | nó da árvore de causa-raiz / execução aberta | — |
+| `y` | posição de scroll (gravada com debounce de 300ms) | `0` |
+
+### Virtualização (`src/hooks/useWindowedRows.ts`)
+Renderização por janela preservando a semântica de `<table>`: linhas fora da janela viram **spacers** (`<tr style="height">`) em vez de posicionamento absoluto. Ativa apenas acima de 50 linhas por página — abaixo disso a tabela renderiza integralmente (previsibilidade e testes determinísticos).
