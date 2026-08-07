@@ -656,7 +656,7 @@ export default function CtirSyncAuditPage() {
   );
 }
 
-function Pager({ page, setPage, total }: { page: number; setPage: (n: number) => void; total: number }) {
+function Pager({ page, setPage, total, pageSize }: { page: number; setPage: (n: number) => void; total: number; pageSize: number }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="flex items-center justify-between pt-3 text-xs font-mono">
