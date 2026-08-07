@@ -17,6 +17,9 @@ import { ChevronDown, ChevronRight, RefreshCw, ShieldAlert, CheckCircle2, XCircl
 import { useSearchParams } from "react-router-dom";
 
 import { useSyncProgress } from "@/hooks/useSyncProgress";
+import { useWindowedRows } from "@/hooks/useWindowedRows";
+import { useExportQueue } from "@/hooks/useExportQueue";
+import ExportJobsPanel from "@/components/ExportJobsPanel";
 import SyncCauseTree from "@/components/SyncCauseTree";
 import { exportCsv, exportPdf, type ExportScope } from "@/lib/ctirAuditExport";
 
