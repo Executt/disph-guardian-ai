@@ -313,14 +313,25 @@ export default function CtirSyncAuditPage() {
     ]),
   });
 
-  const doExport = (fmt: "csv" | "pdf") => {
+  const doExport = async (fmt: "csv" | "pdf") => {
     const tab = activeTab === "alerts" ? "alerts" : "runs";
     const { headers, rows } = tab === "alerts" ? alertsExport() : runsExport();
     if (rows.length === 0) return toast.error("Nada para exportar com os filtros atuais");
     const meta = { ...exportMetaBase, tab } as const;
-    fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
-    toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+    try {
+      // fila assíncrona: geração em background + download por link assinado (RLS)
+      await enqueue(
+        { tab, format: fmt, scope: exportScope, filters: meta },
+        { headers, rows, meta },
+      );
+      toast.success(`Exportação ${fmt.toUpperCase()} enfileirada (${rows.length} registros)`);
+    } catch {
+      // fallback local quando a fila não está disponível
+      fmt === "csv" ? exportCsv(headers, rows, meta) : exportPdf(headers, rows, meta);
+      toast.success(`Exportação ${fmt.toUpperCase()} gerada (${rows.length} registros)`);
+    }
   };
+
 
 
 
