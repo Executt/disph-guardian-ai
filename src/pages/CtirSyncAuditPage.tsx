@@ -551,6 +551,13 @@ export default function CtirSyncAuditPage() {
         <TabsContent value="runs">
           <Card>
             <CardContent className="pt-4">
+              <div
+                ref={runsWindow.containerRef}
+                onScroll={runsWindow.onScroll}
+                data-testid="runs-scroll"
+                className={runsWindow.active ? "overflow-y-auto" : ""}
+                style={runsWindow.active ? { maxHeight: 560 } : undefined}
+              >
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -566,7 +573,11 @@ export default function CtirSyncAuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedAudits.map(a => {
+                  {runsWindow.padTop > 0 && (
+                    <TableRow style={{ height: runsWindow.padTop }} aria-hidden><TableCell colSpan={9} /></TableRow>
+                  )}
+                  {windowedAudits.map(a => {
+
                     const d = a.details ?? {};
                     const isOpen = expanded.has(a.id);
                     return (
