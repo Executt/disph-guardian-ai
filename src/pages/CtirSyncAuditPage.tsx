@@ -264,8 +264,8 @@ export default function CtirSyncAuditPage() {
     return Object.values(buckets).sort((a, b) => a.key - b.key).slice(-31);
   }, [filteredAlerts]);
 
-  const pagedAudits = filteredAudits.slice(runsPage * PAGE_SIZE, runsPage * PAGE_SIZE + PAGE_SIZE);
-  const pagedAlerts = filteredAlerts.slice(alertsPage * PAGE_SIZE, alertsPage * PAGE_SIZE + PAGE_SIZE);
+  const pagedAudits = filteredAudits.slice(runsPage * pageSize, runsPage * pageSize + pageSize);
+  const pagedAlerts = filteredAlerts.slice(alertsPage * pageSize, alertsPage * pageSize + pageSize);
 
   const toggle = (id: string) => {
     const next = new Set(expanded);
@@ -276,7 +276,7 @@ export default function CtirSyncAuditPage() {
   // deep-link: abre a execução correspondente ao nó selecionado na árvore
   const openRun = (runId: string) => {
     const idx = filteredAudits.findIndex(a => a.id === runId);
-    if (idx >= 0) setRunsPage(Math.floor(idx / PAGE_SIZE));
+    if (idx >= 0) setRunsPage(Math.floor(idx / pageSize));
     setExpanded(prev => new Set([...prev, runId]));
     patchParams({ tab: "runs", run: runId });
     requestAnimationFrame(() => {
@@ -654,11 +654,11 @@ export default function CtirSyncAuditPage() {
 }
 
 function Pager({ page, setPage, total }: { page: number; setPage: (n: number) => void; total: number }) {
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="flex items-center justify-between pt-3 text-xs font-mono">
       <span className="text-muted-foreground">
-        {total === 0 ? "0 registros" : `${page * PAGE_SIZE + 1}–${Math.min(total, (page + 1) * PAGE_SIZE)} de ${total}`}
+        {total === 0 ? "0 registros" : `${page * pageSize + 1}–${Math.min(total, (page + 1) * pageSize)} de ${total}`}
       </span>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</Button>
