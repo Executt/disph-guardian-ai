@@ -588,7 +588,7 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
-              <Pager page={runsPage} setPage={setRunsPage} total={filteredAudits.length} />
+              <Pager page={runsPage} setPage={setRunsPage} total={filteredAudits.length} pageSize={pageSize} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -635,7 +635,7 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
-              <Pager page={alertsPage} setPage={setAlertsPage} total={filteredAlerts.length} />
+              <Pager page={alertsPage} setPage={setAlertsPage} total={filteredAlerts.length} pageSize={pageSize} />
             </CardContent>
           </Card>
         </TabsContent>
