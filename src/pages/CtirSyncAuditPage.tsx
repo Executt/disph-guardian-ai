@@ -103,8 +103,6 @@ export default function CtirSyncAuditPage() {
   // fila assíncrona de exportação (geração em background + download assinado)
   const { jobs: exportJobs, enqueue, download: downloadJob, remove: removeJob } = useExportQueue("ctir_audit");
 
-  // virtualização das tabelas (renderização por janela)
-  const runsWindow = useWindowedRows(0, { rowHeight: ROW_HEIGHT });
 
   // posição de scroll persistida na URL
   const scrollY = Number(params.get("y") ?? 0) || 0;
