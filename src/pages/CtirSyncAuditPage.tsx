@@ -617,6 +617,9 @@ export default function CtirSyncAuditPage() {
                       </>
                     );
                   })}
+                  {runsWindow.padBottom > 0 && (
+                    <TableRow style={{ height: runsWindow.padBottom }} aria-hidden><TableCell colSpan={9} /></TableRow>
+                  )}
                   {filteredAudits.length === 0 && !loading && (
                     <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">
                       Nenhuma execução registrada no período selecionado.
@@ -624,6 +627,7 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
               <Pager page={runsPage} setPage={setRunsPage} total={filteredAudits.length} pageSize={pageSize} />
             </CardContent>
           </Card>
@@ -632,6 +636,13 @@ export default function CtirSyncAuditPage() {
         <TabsContent value="alerts">
           <Card>
             <CardContent className="pt-4">
+              <div
+                ref={alertsWindow.containerRef}
+                onScroll={alertsWindow.onScroll}
+                data-testid="alerts-scroll"
+                className={alertsWindow.active ? "overflow-y-auto" : ""}
+                style={alertsWindow.active ? { maxHeight: 560 } : undefined}
+              >
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -643,7 +654,10 @@ export default function CtirSyncAuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedAlerts.map(a => (
+                  {alertsWindow.padTop > 0 && (
+                    <TableRow style={{ height: alertsWindow.padTop }} aria-hidden><TableCell colSpan={5} /></TableRow>
+                  )}
+                  {windowedAlerts.map(a => (
                     <TableRow key={a.id}>
                       <TableCell className="font-mono text-xs">
                         {formatDistanceToNow(new Date(a.created_at), { addSuffix: true, locale: ptBR })}
@@ -664,6 +678,9 @@ export default function CtirSyncAuditPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {alertsWindow.padBottom > 0 && (
+                    <TableRow style={{ height: alertsWindow.padBottom }} aria-hidden><TableCell colSpan={5} /></TableRow>
+                  )}
                   {filteredAlerts.length === 0 && (
                     <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
                       Sem alertas.
@@ -671,7 +688,9 @@ export default function CtirSyncAuditPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
               <Pager page={alertsPage} setPage={setAlertsPage} total={filteredAlerts.length} pageSize={pageSize} />
+
             </CardContent>
           </Card>
         </TabsContent>
